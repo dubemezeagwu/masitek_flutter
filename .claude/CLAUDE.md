@@ -295,11 +295,66 @@ App degrades gracefully:
 - **UI feedback:** Shows attempt count (e.g., "Connecting (3/5)")
 
 ### Mid-Session Disconnect
-- **Detection:** Immediate (connection state listener)
-- **UI update:** Changes to `Reconnecting` state
-- **Data handling:** Buffer continues accumulating locally (no data loss)
-- **Reconnection:** Automatic retry with same backoff strategy
-- **Data preservation:** All raw samples preserved throughout disconnect/reconnect
+
+**Detection:** Immediate (via `device.connectionState.listen()`)
+
+**Reconnection Flow:**
+```dart
+Connection lost detected
+  ↓
+1. Status bar → "Reconnecting" (yellow)
+  ↓
+2. Chart freezes (no new data)
+  ↓
+3. Camera CONTINUES recording
+  ↓
+4. Worker isolate CONTINUES buffering locally
+  ↓
+5. For each reconnection attempt (1-5):
+   │
+   ├─ await device.connect(autoConnect: true);  // Use autoConnect for known devices
+   │
+   ├─ CRITICAL: await device.discoverServices();  // MUST re-discover after EVERY reconnect
+   │
+   ├─ Find NUS service (6E400001-...)
+   │   BluetoothService nusService = services.firstWhere(...);
+   │
+   ├─ Find TX characteristic (6E400003-...)
+   │   BluetoothCharacteristic txChar = nusService.characteristics.firstWhere(...);
+   │
+   ├─ Re-subscribe (old subscription auto-cancelled by disconnect)
+   │   final sub = txChar.onValueReceived.listen(...);
+   │   device.cancelWhenDisconnected(sub, delayed: true);
+   │
+   ├─ await txChar.setNotifyValue(true);
+   │
+   └─ IF SUCCESS:
+        - Status → "Connected" (green)
+        - Resume data flow (worker isolate flushes buffer)
+        - Chart resumes updating
+        - BREAK (exit retry loop)
+
+      IF FAILURE:
+        - Wait (exponential backoff: 1s, 2s, 4s, 8s, 16s)
+        - Retry (max 5 attempts)
+  ↓
+IF all attempts fail:
+  - Status → "Disconnected" (red)
+  - Show error snackbar
+  - User can manually stop scan (saves partial data + video)
+```
+
+**Critical Rules:**
+1. **ALWAYS re-discover services after reconnect** - Service handles are invalidated on disconnect
+2. **ALWAYS re-subscribe to characteristics** - Old subscriptions are auto-cancelled
+3. **Use `autoConnect: true`** - Returns immediately without timeout for known devices
+4. **Worker isolate buffering** - Continues accumulating data during reconnect (no data loss)
+
+**Data Preservation:**
+- All raw samples preserved in worker isolate buffer
+- Chart state frozen at last known values
+- Camera continues recording throughout
+- On reconnect success: buffer flushes to file, chart resumes
 
 ### UI Communication
 Connection state is **always visible** (persistent status indicator, NOT a modal).
@@ -311,14 +366,18 @@ User sees: `Scanning` / `Connecting (N/5)` / `Connected` / `Reconnecting` / `Fai
 
 | Edge Case | Handling Strategy |
 |-----------|-------------------|
-| BLE disconnect mid-recording | Buffer locally, auto-reconnect, preserve all data |
-| Malformed payload (<8 bytes or unparseable) | Log error, skip sample, continue processing |
-| Script runtime error | Processed series shows error state, raw series continues uninterrupted |
-| Camera permission denied | BLE and chart features continue independently |
-| BLE permission denied | Graceful error with clear user message |
-| Notification rate > chart render rate | Throttle layer absorbs burst, no frame drops |
-| Storage full | Detect before writing, surface error early |
-| Screen lock during session | Document "Stay Awake" flag in README (developer options) |
+| BLE disconnect mid-recording | Buffer locally, auto-reconnect (with service re-discovery), preserve all data |
+| GATT subscription error (codes 1-17) | Device rejected `setNotifyValue(true)`. Disconnect, show "Device rejected subscription (GATT error X)", return to scan screen. Verify characteristic supports notify property. |
+| Service discovery fails | Disconnect, show "Device not compatible (NUS service not found)", return to scan screen |
+| Malformed payload (<8 bytes or unparseable) | Log error with hex dump, skip sample, continue processing. Track malformed count in debug UI. |
+| Script runtime error | Processed series shows error state (red line or null), raw series continues uninterrupted. Log script error to console. |
+| Camera permission denied | BLE and chart features continue independently. Show persistent banner: "Camera disabled - grant permission to record video" |
+| BLE permission denied | Graceful error with clear user message and deep link to Settings. App cannot function without BLE. |
+| Notification rate > chart render rate | Throttle layer absorbs burst (60fps cap), no frame drops. Worker isolate queues all data regardless. |
+| Storage full | Detect before writing (check `Directory.statFs()`), surface error early. Prevent scan start if <100MB free. |
+| Screen lock during session | iOS: Handled via background mode. Android: Document "Stay Awake" flag in Developer Options README. |
+| Scan rate limiting (Android) | After 5 failed scan attempts, enforce 30s cooldown before allowing rescan. Show countdown timer in UI. |
+| Duplicate notification listeners | Prevented via `device.cancelWhenDisconnected()` on every subscription. Old listeners auto-cancelled on disconnect. |
 
 ---
 
@@ -421,6 +480,117 @@ Document in README as known constraint, do NOT work around silently.
 
 ---
 
+## PLATFORM-SPECIFIC SETUP
+
+### iOS Configuration
+
+#### Background BLE Support
+**Required for:** Maintaining BLE connection when app goes to background (screen lock during recording)
+
+**Add to `ios/Runner/Info.plist`:**
+```xml
+<key>UIBackgroundModes</key>
+<array>
+  <string>bluetooth-central</string>
+</array>
+
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>This app uses Bluetooth to connect to sensor devices and receive data.</string>
+```
+
+**Add to `main.dart` (before any BLE operations):**
+```dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isIOS) {
+    await FlutterBluePlus.setOptions(restoreState: true);
+  }
+
+  runApp(const MyApp());
+}
+```
+
+**Why:** Without background mode, iOS suspends BLE when screen locks, causing disconnect during recording.
+
+---
+
+### Android Configuration
+
+#### Proguard Rules (Release Builds)
+**Required for:** Preventing crashes in release/production builds
+
+**Add to `android/app/proguard-rules.pro`:**
+```
+-keep class com.lib.flutter_blue_plus.* { *; }
+```
+
+**Create file if it doesn't exist:**
+```bash
+touch android/app/proguard-rules.pro
+```
+
+**Why:** Without this rule, Proguard obfuscation breaks flutter_blue_plus in release builds.
+
+#### Permissions (Already in Manifest)
+Verify `android/app/src/main/AndroidManifest.xml` includes:
+
+```xml
+<!-- Android 12+ -->
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+                 android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+<!-- Android 6-11 (Legacy) -->
+<uses-permission android:name="android.permission.BLUETOOTH" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+```
+
+**Note:** Runtime permission handling via `permission_handler` package (SDK-branched logic in code).
+
+---
+
+### Debug Configuration
+
+**Enable verbose BLE logging during development:**
+
+**Add to `main.dart`:**
+```dart
+import 'package:flutter/foundation.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Debug logging (only in debug builds)
+  if (kDebugMode) {
+    FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
+  }
+
+  // iOS background support
+  if (Platform.isIOS) {
+    await FlutterBluePlus.setOptions(restoreState: true);
+  }
+
+  runApp(const MyApp());
+}
+```
+
+**Log Output (color-coded):**
+- ⚫ Function names
+- 🟣 Platform arguments
+- 🟡 Platform responses
+
+**Custom log routing (optional):**
+```dart
+FlutterBluePlus.logs.listen((String logMessage) {
+  // Route to custom logging service
+  debugPrint('[FBP] $logMessage');
+});
+```
+
+---
+
 ## CHART PERFORMANCE CONSTRAINTS
 
 ### Rolling Window
@@ -460,6 +630,18 @@ When buffer exceeds 250, drop oldest values.
 - **Android 7/8:** Have OS-level BLE stack bugs (not app-level issue)
 - Document this in README as known constraint
 
+### flutter_blue_plus Package
+- **Bluetooth Classic NOT supported:** HC-05, HC-06, speakers, headphones, keyboards incompatible. Requires BLE GATT only.
+- **Service re-discovery required:** MUST call `discoverServices()` after EVERY reconnect (handles invalidated on disconnect)
+- **Subscription cleanup critical:** Always use `device.cancelWhenDisconnected()` to prevent memory leaks and duplicate listeners
+- **Stop scan before connect:** Some Android devices fail simultaneous scan+connect operations
+- **Scan rate limiting:** Max 5 scans per 30 seconds (Android platform limit) - enforce cooldown in app
+- **GATT errors (codes 1-17):** Device rejection of read/write/notify requests - handle gracefully
+- **iOS remoteId changes:** Periodically changes for privacy (Android uses static MAC)
+- **Hot reload insufficient:** Full app restart required after adding plugin
+- **Proguard required:** Must add keep rule for release builds or app will crash
+- **autoConnect advantage:** Use `connect(autoConnect: true)` for known devices - returns immediately without timeout
+
 ### Assessment Scope
 - **UI design:** Explicitly NOT assessed
 - **Focus areas:** Architecture, concurrency, scripting, resilience
@@ -481,6 +663,223 @@ When writing the project README, include:
 5. **Running the App** (flutter run commands, developer options)
 6. **Permissions** (what's needed and why)
 7. **Session Workflow** (how scans work within connection)
+
+---
+
+## UI/UX FLOW
+
+### Two-Screen Application
+
+#### Screen 1: BLE Device Scanner & Connection
+
+**Initial State:**
+- Single "Scan for Devices" button centered on screen
+
+**Scanning State:**
+- Button changes to "Scanning..." (disabled)
+- ListView/Column appears showing discovered devices in real-time
+- Each device item shows:
+  - Device name (e.g., "NUS-Py")
+  - Device ID/MAC address (optional, for debugging)
+  - "Connect" button
+
+**Connection Flow:**
+```dart
+User taps [Connect] on device
+  ↓
+1. await FlutterBluePlus.stopScan();  // CRITICAL: Stop scanning before connecting
+  ↓
+2. await device.connect();
+  ↓
+3. List<BluetoothService> services = await device.discoverServices();
+  ↓
+4. Find NUS service (6E400001-B5A3-F393-E0A9-E50E24DCCA9E)
+   BluetoothService nusService = services.firstWhere(
+     (s) => s.uuid == Guid("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
+   );
+  ↓
+5. Find TX characteristic (6E400003-B5A3-F393-E0A9-E50E24DCCA9E)
+   BluetoothCharacteristic txChar = nusService.characteristics.firstWhere(
+     (c) => c.uuid == Guid("6E400003-B5A3-F393-E0A9-E50E24DCCA9E")
+   );
+  ↓
+6. Set up notification listener + auto-cleanup
+   final subscription = txChar.onValueReceived.listen((bytes) {
+     // Forward to worker isolate for processing
+   });
+   device.cancelWhenDisconnected(subscription, delayed: true);
+  ↓
+7. Subscribe to notifications (with GATT error handling)
+   try {
+     await txChar.setNotifyValue(true);
+   } on PlatformException catch (e) {
+     if (e.code.contains('set_notification_failed')) {
+       // GATT error: Device rejected subscription
+       await device.disconnect();
+       // Show specific error, return to scan list
+     }
+     rethrow;
+   }
+  ↓
+8. Navigate to Main Screen (only after successful subscription confirmation)
+```
+
+**Critical Rules:**
+1. ❌ **DON'T** navigate immediately after `device.connect()` succeeds
+   ✅ **DO** navigate after `txCharacteristic.setNotifyValue(true)` confirms subscription
+
+2. ❌ **DON'T** connect while scanning (causes failures on some Android devices)
+   ✅ **DO** stop scan before connecting
+
+3. ❌ **DON'T** forget subscription cleanup
+   ✅ **DO** use `device.cancelWhenDisconnected()` to prevent memory leaks
+
+**Why These Rules Matter:**
+- **Subscription before navigation:** Connection can succeed but subscription can fail (GATT error). Navigating early lands user on main screen with no incoming data.
+- **Stop scan before connect:** Some Android BLE stacks can't handle simultaneous scan+connect operations.
+- **Auto-cleanup:** On disconnect/reconnect, old listeners can persist and cause duplicate data or memory leaks.
+
+**Error Handling:**
+- Connection fails: Show error snackbar, return to scan list
+- Service discovery fails: Disconnect, show "Device not compatible (NUS service not found)"
+- Subscription fails (GATT error): Disconnect, show "Device rejected subscription", return to scan list
+- Permission denied: Show clear message with steps to enable in Settings
+
+---
+
+#### Screen 2: Main Recording Screen
+
+**Layout (Top to Bottom):**
+
+1. **Status Bar (Top)**
+   - Connection state: "Connected" / "Reconnecting" / "Disconnected"
+   - Color-coded: Green (connected), Yellow (reconnecting), Red (disconnected)
+
+2. **Debug Info Row**
+   - Label: "Last Payload (hex)"
+   - Value: `00 01 fe ff 00 01 00 00` (updates with each notification)
+   - Purpose: Debugging aid, shows raw bytes received
+
+3. **Live Chart (Center - Main Area)**
+   - **Two series on same chart:**
+     - Blue line: Raw int16 values
+     - Orange/Red line: Processed values (script output)
+   - X-axis: Time (rolling window, last 250 points)
+   - Y-axis: Value range (auto-scaling)
+   - Chart updates in real-time as data streams in (throttled to 60fps)
+
+4. **Camera Preview (Phase 2 - Nice to Have)**
+   - Small rectangle overlay (e.g., 150x200 positioned bottom-left)
+   - Shows live camera feed during recording
+   - **Priority:** Low - implement after core features working
+   - **Rationale:** Not in Przemek's reference screenshot, not a core requirement
+
+5. **Floating Action Button (Bottom Right)**
+   - **Idle state:** "Start Scan" icon/text
+   - **Recording state:** "Stop Scan" icon/text (red background)
+
+**Recording Workflow:**
+
+```
+User taps [Start Scan] FAB
+  ↓
+1. Camera starts recording (background, no preview in Phase 1)
+  ↓
+2. User presses "Send sin(x)/x" on BLE server
+  ↓
+3. BLE notifications arrive → Worker isolate processes
+  ↓
+4. Chart updates with raw + processed values (60fps throttle)
+  ↓
+User taps [Stop Scan] FAB
+  ↓
+5. Stop camera recording
+  ↓
+6. Serialize data to JSON (compute isolate)
+  ↓
+7. Save JSON + video files (ISO 8601 timestamps)
+  ↓
+8. Show "Saved" confirmation snackbar
+```
+
+**Disconnect Handling (Mid-Recording):**
+
+```
+BLE connection lost detected
+  ↓
+1. Status bar updates to "Reconnecting" (yellow)
+  ↓
+2. Chart freezes (no new data points)
+  ↓
+3. Camera CONTINUES recording (data preserved)
+  ↓
+4. Auto-reconnect attempts start (exponential backoff: 1s, 2s, 4s, 8s, 16s)
+  ↓
+IF reconnect succeeds:
+  - Status → "Connected" (green)
+  - Chart resumes updating
+  - No data loss (worker isolate buffered during disconnect)
+  ↓
+IF reconnect fails after 5 attempts:
+  - Status → "Disconnected" (red)
+  - Show error snackbar
+  - User can manually stop scan (saves partial data + video)
+```
+
+**State During Disconnect:**
+- Worker isolate: Continues buffering (ready for reconnect)
+- Camera: Keeps recording
+- Chart: Frozen at last known values
+- UI: Responsive, shows reconnection attempts
+
+---
+
+### Screen 3: History (Future - Phase 2)
+
+**Scope:** Out of scope for 2-week deadline
+**Implementation:** Add later if time permits
+
+**Design Notes (for later):**
+- List of past recording sessions
+- Each item shows: Timestamp, duration, sample count, thumbnail
+- Tap to view saved video + raw data
+- Export options (share JSON, video)
+
+**Prerequisite:** Build persistence layer correctly from day 1 (already planned).
+Adding history screen becomes trivial if files use ISO 8601 naming + structured JSON.
+
+---
+
+### Development Phases
+
+#### Phase 1: Core Functionality (2-Week Priority)
+1. ✅ Screen 1: BLE scanning + connection + subscription
+2. ✅ Screen 2: Status display + chart rendering
+3. ✅ Worker isolate: Data parsing + script execution
+4. ✅ Camera: Background recording (no preview)
+5. ✅ Persistence: JSON + video saving
+6. ✅ Reconnection: Auto-retry with exponential backoff
+
+#### Phase 2: Polish (If Time Permits)
+1. Camera preview overlay (small box on main screen)
+2. History screen (list past sessions)
+3. User-editable scripts (text input for transformations)
+4. Chart visual polish (legends, grid lines, axis labels)
+
+**Priority Rule:** Don't start Phase 2 until Phase 1 is 100% complete and tested.
+
+---
+
+### Key UI/UX Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| Navigate after subscription (not connection) | Prevents landing on main screen with no data |
+| No camera preview initially | Not in requirements, not in Przemek's screenshot |
+| Status bar always visible | User always knows connection state (not hidden in modal) |
+| Hex payload display | Debugging aid - shows raw data is arriving |
+| FAB for scan control | Common Flutter pattern, doesn't obscure chart |
+| Auto-reconnect (no user prompt) | Seamless experience, preserves data during brief disconnects |
 
 ---
 
