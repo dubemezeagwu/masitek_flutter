@@ -470,9 +470,16 @@ Future enhancement: UI text field for user-defined transformations.
 
 | Setting | Value | Reason |
 |---------|-------|--------|
-| `minSdkVersion` | 21 | BLE introduced at API 21 |
+| `minSdkVersion` | 23 | Camera package requires API 23+ (Android 6.0) |
 | `targetSdkVersion` | 28 | Test device, stable BLE stack |
+| `ndkVersion` | 27.0.12077973 | Required by camera_android_camerax and other plugins |
 | **Recommended minimum** | API 28 | Android 7/8 have OS-level BLE bugs (outside app control) |
+
+**Note on minSdk=23:**
+- Original plan was minSdk=21 (BLE introduced at API 21)
+- Camera package (camera_android_camerax) requires API 23+
+- **Impact:** App supports Android 6.0+ instead of Android 5.0+
+- **Test device (API 28) unaffected** - Infinix X652A still compatible
 
 **Note on Android 7/8:**
 BLE instability on these versions is an **OS-level issue**, not application-level.
@@ -535,6 +542,13 @@ touch android/app/proguard-rules.pro
 #### Permissions (Already in Manifest)
 Verify `android/app/src/main/AndroidManifest.xml` includes:
 
+**Manifest declaration (add tools namespace):**
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+```
+
+**Permissions:**
 ```xml
 <!-- Android 12+ -->
 <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
@@ -542,10 +556,28 @@ Verify `android/app/src/main/AndroidManifest.xml` includes:
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
 <!-- Android 6-11 (Legacy) -->
-<uses-permission android:name="android.permission.BLUETOOTH" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.BLUETOOTH"
+                 android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+                 android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+                 android:maxSdkVersion="30" />
+
+<!-- Camera -->
+<uses-permission android:name="android.permission.CAMERA" />
+
+<!-- Storage (Android 13+) -->
+<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
+<!-- Storage (Android 12 and below) - conflict resolver required -->
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+                 android:maxSdkVersion="32"
+                 tools:replace="android:maxSdkVersion" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+                 android:maxSdkVersion="32" />
 ```
+
+**Why `tools:replace`?** camera_android_camerax declares WRITE_EXTERNAL_STORAGE with maxSdkVersion=28, but we need 32. The `tools:replace` directive tells Gradle to use our value during manifest merger.
 
 **Note:** Runtime permission handling via `permission_handler` package (SDK-branched logic in code).
 
@@ -919,7 +951,39 @@ Whenever making non-obvious choices, add inline comments explaining:
 - What tradeoffs were considered
 - How this aligns with assessment priorities
 
+### Documentation Maintenance Protocol
+
+**CRITICAL:** After every milestone completion or significant change, **IMMEDIATELY** update all relevant documentation to prevent stale information.
+
+**Documentation files to keep synchronized:**
+1. **CLAUDE.md** - Architecture decisions, configuration values, constraints
+2. **milestone.md** - Task completion status, updated file paths, refined estimates
+3. **Inline code comments** - Technical decisions, why specific approaches were chosen
+
+**When to update:**
+- ✅ After completing a milestone (before merging to main)
+- ✅ After fixing build errors (SDK versions, NDK, manifest changes)
+- ✅ After architectural refactors (folder structure, package changes)
+- ✅ When discovering new constraints (library limitations, platform bugs)
+- ✅ When changing SDK/API requirements (minSdk, targetSdk, permissions)
+
+**Example scenarios:**
+- **Milestone 1 completion:** Updated minSdk (21→23), NDK version, folder structure paths
+- **Build fix:** Documented `tools:replace` manifest conflict resolver
+- **Package analysis:** Added flutter_blue_plus constraints to CLAUDE.md
+
+**Why this matters:**
+- Prevents confusion when resuming work after breaks
+- Ensures Przemek sees accurate, up-to-date documentation during code review
+- Maintains single source of truth for architectural decisions
+- Helps future debugging by documenting "why" decisions were made
+
+**Action for Claude:**
+- At the end of EVERY milestone, proactively ask: "Should I update CLAUDE.md and milestone.md to reflect the changes we just made?"
+- When making configuration changes (build.gradle, manifest, etc.), immediately update relevant documentation sections
+- Keep milestone.md status column current (⬜ → 🔄 → ✅)
+
 ---
 
-**Last Updated:** 2026-05-06
-**Project Status:** Initial setup - CLAUDE.md created
+**Last Updated:** 2026-05-08
+**Project Status:** Milestone 1 complete - Foundation & folder structure refactored to layered architecture
