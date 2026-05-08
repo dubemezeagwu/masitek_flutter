@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.masitek_flutter"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -24,8 +24,8 @@ android {
         applicationId = "com.example.masitek_flutter"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 23  // Camera package requires API 23+
+        targetSdk = 28  // Test device: Infinix X652A (Android 9, API 28)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
