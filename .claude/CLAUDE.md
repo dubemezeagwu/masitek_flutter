@@ -74,6 +74,7 @@ Once running, type `sinc` to send waveform data.
   - Bytes 0-1: `uint16` channel (fixed at 1)
   - Bytes 2-3: `int16` scaled sinc value
   - Example: `00 01 00 64` = channel 1, value 100
+- **MTU Analysis:** 8 bytes << default MTU (iOS: 135-255 bytes, Android: 512 bytes) → **No fragmentation risk**
 
 ### Known Server Constraints
 **CRITICAL:** Bless 0.3.0 on macOS has unstable BLE advertising with Android (GitHub issue #47)
@@ -267,6 +268,15 @@ All packages pinned to **exact versions** in `pubspec.yaml`. `pubspec.lock` comm
 - **Android 12+ (API 31+):** `BLUETOOTH_SCAN` + `BLUETOOTH_CONNECT`
 - Runtime SDK detection via `device_info_plus` determines which permissions to request
 
+### iOS BLE Permission Dialog
+**Important:** On iOS, the **first call to any flutter_blue_plus method** triggers a system permission dialog:
+```
+"[App Name] would like to use Bluetooth"
+```
+- This is unavoidable (OS requirement)
+- Happens on first `FlutterBluePlus.startScan()` or `device.connect()` call
+- Best practice: Request early in app lifecycle to avoid mid-flow interruptions
+
 ### Camera Permissions
 - **All versions:** `CAMERA` permission (consistent)
 - **Storage (Android 13+ vs older):**
@@ -293,6 +303,30 @@ App degrades gracefully:
 - **Max attempts:** 5
 - **Backoff strategy:** Exponential (1s → 2s → 4s → 8s → 16s)
 - **UI feedback:** Shows attempt count (e.g., "Connecting (3/5)")
+
+**Implementation Pattern:**
+```dart
+Future<void> connectWithRetry(
+  BluetoothDevice device, {
+  int maxAttempts = 5,
+}) async {
+  for (int i = 0; i < maxAttempts; i++) {
+    try {
+      await device.connect(
+        timeout: Duration(seconds: 15),
+        autoConnect: i > 0, // Use autoConnect on retries for known devices
+      );
+      return; // Success - exit retry loop
+    } catch (e) {
+      if (i == maxAttempts - 1) {
+        rethrow; // Final attempt failed
+      }
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+      await Future.delayed(Duration(seconds: 1 << i));
+    }
+  }
+}
+```
 
 ### Mid-Session Disconnect
 
@@ -408,6 +442,19 @@ Future enhancement: UI text field for user-defined transformations.
 ### Execution Context
 - **Thread:** Worker isolate (never main thread)
 - **Performance:** Compilation is expensive (once), execution is cheap (per sample)
+
+### Performance Constraint
+**CRITICAL:** Script execution must complete in **<10ms** to avoid chart lag.
+
+**Why:**
+- BLE notifications arrive at ~100-200Hz during active streaming
+- Chart rebuilds at 60fps (16ms per frame)
+- If script execution exceeds 10ms, processed series will lag behind raw series
+
+**Mitigation:**
+- QuickJS execution is fast enough for simple transforms (`raw * 0.12 + 34`)
+- Avoid complex operations (loops, regex, heavy math) in user scripts
+- Profile script performance during development
 
 ---
 
@@ -589,6 +636,38 @@ FlutterBluePlus.logs.listen((String logMessage) {
 });
 ```
 
+### Operation Queue Mode
+
+**Required for optimal BLE performance:**
+
+**Add to `main.dart` (before runApp):**
+```dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Set operation queue mode for single-device scenario
+  FlutterBluePlus.setOperationQueueMode(OperationQueueMode.perDevice);
+
+  // Debug logging (only in debug builds)
+  if (kDebugMode) {
+    FlutterBluePlus.setLogLevel(LogLevel.verbose, color: true);
+  }
+
+  // iOS background support
+  if (Platform.isIOS) {
+    await FlutterBluePlus.setOptions(restoreState: true);
+  }
+
+  runApp(const ProviderScope(child: MyApp()));
+}
+```
+
+**Why this matters:**
+- **Default behavior:** Global operation queue (all BLE operations queued globally across all devices)
+- **Problem:** If `discoverServices()` is running, incoming notifications might queue behind it → laggy connection
+- **Solution:** Per-device queuing ensures operations for our single NUS-Py device don't block each other
+- **Assessment context:** Single device = per-device mode is optimal
+
 ---
 
 ## CHART PERFORMANCE CONSTRAINTS
@@ -641,6 +720,67 @@ When buffer exceeds 250, drop oldest values.
 - **Hot reload insufficient:** Full app restart required after adding plugin
 - **Proguard required:** Must add keep rule for release builds or app will crash
 - **autoConnect advantage:** Use `connect(autoConnect: true)` for known devices - returns immediately without timeout
+- **MTU is not a concern:** Server sends 8 bytes/notification << default MTU (iOS: 135-255 bytes, Android: 512 bytes). No fragmentation risk.
+- **Stream choice:** Use `onValueReceived` (receive-only, cleaner) over `lastValueStream` (includes writes)
+
+### CRITICAL: Duplicate Subscription Bug
+
+**Problem:** UI rebuilds or reconnections can create duplicate listeners → chart shows doubled values.
+
+**Symptom:**
+```dart
+// BAD - causes duplicate data:
+Widget build(BuildContext context) {
+  txChar.onValueReceived.listen((data) {
+    updateChart(data); // Listener created EVERY rebuild!
+  });
+}
+```
+
+**Solution Pattern:**
+```dart
+// GOOD - manage subscription lifecycle properly:
+class BleService {
+  StreamSubscription<List<int>>? _subscription;
+
+  Future<void> subscribe(BluetoothCharacteristic txChar, BluetoothDevice device) async {
+    // 1. Cancel old subscription (if exists)
+    await _subscription?.cancel();
+
+    // 2. Subscribe to notifications
+    await txChar.setNotifyValue(true);
+
+    // 3. Create new listener
+    _subscription = txChar.onValueReceived.listen((data) {
+      // Forward to worker isolate
+    });
+
+    // 4. Auto-cleanup on disconnect
+    device.cancelWhenDisconnected(_subscription!, delayed: true);
+  }
+
+  void dispose() {
+    _subscription?.cancel();
+  }
+}
+```
+
+**Key Rules:**
+1. Store subscription in a field (not local variable)
+2. Cancel old subscription before creating new one
+3. Use `device.cancelWhenDisconnected(subscription, delayed: true)` for auto-cleanup
+4. Never create subscriptions in `build()` methods or UI code
+
+### Top 3 Gotchas (Summary)
+
+**1. Duplicate Subscriptions = Duplicate Data**
+- **Fix:** Always cancel old subscription before creating new one
+
+**2. Python Server Flaky on macOS + Android**
+- **Fix:** Retry connection 3-5 times, or use Windows for testing
+
+**3. UI Jank from Main Thread Processing**
+- **Fix:** Move byte parsing + scripting to background isolate/compute
 
 ### Assessment Scope
 - **UI design:** Explicitly NOT assessed
@@ -663,6 +803,75 @@ When writing the project README, include:
 5. **Running the App** (flutter run commands, developer options)
 6. **Permissions** (what's needed and why)
 7. **Session Workflow** (how scans work within connection)
+8. **Testing with nRF Connect** (debugging BLE connection before running Flutter app)
+
+---
+
+## DEVELOPMENT & DEBUGGING TIPS
+
+### Testing BLE Server Before App Development
+
+**Use nRF Connect app (iOS/Android) to verify server stability:**
+
+1. **Start Python server:**
+   ```bash
+   cd /Users/dubemezeagwu/Developer/masitek-app/ble-gatt-server
+   git checkout bless-0.3.0-working
+   source .venv-0.3.0/bin/activate
+   python3 ble/main_headless.py
+   ```
+
+2. **Open nRF Connect app:**
+   - Scan for devices
+   - Verify "NUS-Py" appears in scan results
+   - Connect to device
+   - Navigate to Services → `6E400001-B5A3-F393-E0A9-E50E24DCCA9E`
+   - Subscribe to TX characteristic (`6E400003-...`)
+
+3. **Trigger data:**
+   - Type `sinc` in Python server terminal
+   - Verify 8-byte notifications arrive in nRF Connect
+
+4. **Expected behavior:**
+   - **Initial connection:** May fail 1-2 times (Bless 0.3.0 bug), keep retrying
+   - **Once connected:** Very stable, no disconnects
+   - **Notifications:** Arrive consistently at ~100-200Hz
+
+**Why this matters:**
+- Confirms server is working before debugging Flutter app
+- Separates server issues from app issues
+- Validates payload format (8 bytes hex)
+
+### Alternative Persistence Pattern (Not Used)
+
+Our approach: **Buffer in worker isolate, serialize to JSON at session end**
+
+Alternative (from flutter_blue_plus docs): **Incremental binary append**
+```dart
+// Example (for reference, NOT our implementation):
+final file = File('${docsDir}/ble_data.bin');
+final sink = file.openWrite(mode: FileMode.append);
+
+subscription = txChar.onValueReceived.listen((bytes) {
+  sink.add(bytes); // Append 8 bytes immediately
+});
+
+// On stop:
+await sink.flush();
+await sink.close();
+```
+
+**Why we chose JSON over binary:**
+- Structured format (supports session metadata)
+- Easy to read/debug during development
+- Can include processed values alongside raw values
+- Android handles JSON natively
+
+**When to consider binary:**
+- Very long sessions (>10,000 samples) where JSON file size becomes an issue
+- Need to replay exact byte stream for debugging
+
+For this assessment, JSON is the right choice.
 
 ---
 
