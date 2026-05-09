@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/theme/app_theme.dart';
 import 'presentation/screens/scan_screen.dart';
 
 void main() async {
@@ -22,10 +23,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Masitek BLE App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
       home: const ScanScreen(),
     );
   }
