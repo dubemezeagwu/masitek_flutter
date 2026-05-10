@@ -1,7 +1,7 @@
 # Masitek Flutter App - Development Milestones
 
-**Last Updated:** 2026-05-07
-**Status:** Planning Phase
+**Last Updated:** 2026-05-08
+**Status:** Milestone 1 Complete - Foundation & Layered Architecture
 **Target Completion:** 90% by 2026-05-20 (2 weeks)
 
 ---
@@ -362,7 +362,7 @@ git push -u origin dev
 
 | Milestone | Duration | Cumulative | Status |
 |-----------|----------|------------|--------|
-| 1. Foundation | 1-2h | 2h | ⬜ Not Started |
+| 1. Foundation | 1-2h | 2h | ✅ Complete |
 | 2. UI Scaffolding | 2-3h | 5h | ⬜ Not Started |
 | 3. BLE Scanning + Permissions | 4-5h | 10h | ⬜ Not Started |
 | 4. BLE Connection + GATT Errors | 4-5h | 15h | ⬜ Not Started |
@@ -384,7 +384,7 @@ git push -u origin dev
 
 **Duration:** 1-2 hours
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Tasks
 
@@ -435,42 +435,52 @@ dev_dependencies:
 
 #### 1.2 Create Folder Structure
 
+**Layered Architecture (4 layers: core, ble, data, services, presentation):**
+
 ```
 lib/
 ├── main.dart
-├── models/
-│   ├── raw_sample.dart
-│   ├── processed_sample.dart
-│   ├── recording_session.dart
-│   └── ble_connection_state.dart
-├── services/
-│   ├── ble_service.dart          # BLE comm layer
-│   ├── worker_isolate.dart       # Data processing isolate
-│   ├── camera_service.dart       # Camera recording
-│   └── storage_service.dart      # JSON + video persistence
-├── providers/
-│   ├── ble_provider.dart
-│   ├── chart_provider.dart
-│   └── session_provider.dart
-├── screens/
-│   ├── scan_screen.dart          # Screen 1: Device list
-│   └── main_screen.dart          # Screen 2: Recording
-├── widgets/
-│   ├── device_list_item.dart
-│   ├── connection_status_bar.dart
-│   ├── chart_placeholder.dart
-│   └── hex_preview_widget.dart
-└── utils/
-    ├── constants.dart            # UUIDs, config
-    ├── payload_parser.dart       # Byte parsing utilities
-    └── logger.dart               # Debug logging
+│
+├── core/                         # Domain layer - shared entities
+│   ├── entities/
+│   │   ├── raw_sample.dart
+│   │   ├── processed_sample.dart
+│   │   ├── recording_session.dart
+│   │   └── ble_connection_state.dart
+│   ├── constants/
+│   │   └── ble_constants.dart    # UUIDs, config (renamed from constants.dart)
+│   └── exceptions/               # (empty for M1, populated in M3+)
+│
+├── ble/                          # BLE Communication Layer (M3-M4)
+│   └── (empty - ready for scanner, connector, stream_handler)
+│
+├── data/                         # Data Processing Layer (M5-M7)
+│   ├── isolate/                  # Worker isolate
+│   ├── parser/                   # Byte parsing
+│   ├── scripting/                # QuickJS engine
+│   ├── buffer/                   # Session buffering
+│   └── persistence/              # JSON writing
+│
+├── services/                     # Cross-cutting services (M8)
+│   └── (empty - ready for camera, permissions, files)
+│
+└── presentation/                 # Presentation Layer (M2+)
+    ├── providers/                # Riverpod state management (M3+)
+    ├── screens/
+    │   └── scan_screen.dart
+    └── widgets/                  # Reusable UI components (M2+)
+```
+
+**Command to create structure:**
+```bash
+mkdir -p lib/{core/{entities,constants,exceptions},ble,data/{isolate,parser,scripting,buffer,persistence},services,presentation/{providers,screens,widgets}}
 ```
 
 ---
 
 #### 1.3 Define Data Models
 
-**`models/ble_connection_state.dart`:**
+**`core/entities/ble_connection_state.dart`:**
 ```dart
 enum BLEConnectionState {
   disconnected,
@@ -482,7 +492,7 @@ enum BLEConnectionState {
 }
 ```
 
-**`models/raw_sample.dart`:**
+**`core/entities/raw_sample.dart`:**
 ```dart
 class RawSample {
   final int channel;      // uint16
@@ -503,7 +513,7 @@ class RawSample {
 }
 ```
 
-**`models/processed_sample.dart`:**
+**`core/entities/processed_sample.dart`:**
 ```dart
 class ProcessedSample {
   final int channel;
@@ -527,7 +537,7 @@ class ProcessedSample {
 }
 ```
 
-**`models/recording_session.dart`:**
+**`core/entities/recording_session.dart`:**
 ```dart
 class RecordingSession {
   final DateTime startTime;
@@ -558,6 +568,13 @@ class RecordingSession {
 
 **`android/app/src/main/AndroidManifest.xml`:**
 
+Update manifest declaration (add tools namespace):
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+```
+
 Add inside `<manifest>` tag (before `<application>`):
 
 ```xml
@@ -580,20 +597,28 @@ Add inside `<manifest>` tag (before `<application>`):
 <!-- Storage (Android 13+) -->
 <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
-<!-- Storage (Android 12 and below) -->
+<!-- Storage (Android 12 and below) - tools:replace resolves conflict with camera package -->
 <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-                 android:maxSdkVersion="32" />
+                 android:maxSdkVersion="32"
+                 tools:replace="android:maxSdkVersion" />
 <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
                  android:maxSdkVersion="32" />
 ```
 
-**`android/app/build.gradle`:**
+**`android/app/build.gradle.kts`:**
 
-```gradle
+```kotlin
 android {
+    namespace = "com.example.masitek_flutter"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = "27.0.12077973"  // Required by camera and other plugins
+
     defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 28
+        applicationId = "com.example.masitek_flutter"
+        minSdk = 23  // Camera package requires API 23+
+        targetSdk = 28  // Test device: Infinix X652A (Android 9, API 28)
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 }
 ```
@@ -613,7 +638,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'screens/scan_screen.dart';
+import 'presentation/screens/scan_screen.dart';  // Updated path after refactor
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -647,7 +672,7 @@ class MyApp extends StatelessWidget {
 
 #### 1.6 Create Constants
 
-**`utils/constants.dart`:**
+**`core/constants/ble_constants.dart`:**
 
 ```dart
 class BLEConstants {
