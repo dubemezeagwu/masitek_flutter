@@ -28,21 +28,57 @@ class DeviceListItem extends StatelessWidget {
         ? device.platformName
         : 'Unknown Device';
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        // Very light blue background, almost white (matching doc-sync)
+        color: const Color(0xFFF5F9FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.cardBorderBlack,
+          width: 3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.cardShadowBlack,
+            offset: const Offset(4, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
       child: ListTile(
-        leading: const Icon(Icons.bluetooth, color: Colors.blue),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Text(
           deviceName,
-          style: theme.textTheme.titleMedium,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
         ),
-        subtitle: Text(
-          device.remoteId.toString(),
-          style: technicalTheme.deviceId,
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(
+            device.remoteId.toString(),
+            style: technicalTheme.deviceId?.copyWith(
+              color: Colors.grey.shade600,
+            ),
+          ),
         ),
         trailing: ElevatedButton(
           onPressed: onConnect,
-          child: const Text('Connect'),
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 12,
+            ),
+          ),
+          child: const Text(
+            'Connect',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
         ),
       ),
     );

@@ -17,17 +17,34 @@ class ConnectionStatusBar extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      color: color.withValues(alpha: 0.2),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.darken(0.2),
+          width: 2,
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.circle, size: 12, color: color),
-          const SizedBox(width: 8),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
           Text(
             status,
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: color.darken(0.3),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: color.darken(0.4),
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
         ],

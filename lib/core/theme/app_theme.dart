@@ -3,15 +3,56 @@ import 'package:flutter/material.dart';
 /// Centralized theme configuration for the Masitek BLE app.
 ///
 /// Defines:
-/// - Color scheme
+/// - Color scheme (powder blue accent with black borders)
 /// - Typography scale (Material 3)
 /// - Custom theme extensions for technical data display
 class AppTheme {
+  // Powder blue accent color inspired by doc-sync design
+  static const Color powderBlue = Color(0xFFADD8E6);
+  static const Color powderBlueDark = Color(0xFF87CEEB);
+  static const Color cardBorderBlack = Color(0xFF000000);
+  static const Color cardShadowBlack = Color(0xFF000000);
+
   /// Primary theme for the app.
   static ThemeData get lightTheme {
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: powderBlue,
+        primary: powderBlueDark,
+        secondary: powderBlue,
+      ),
       useMaterial3: true,
+
+      // Card theme with rounded corners
+      cardTheme: CardThemeData(
+        elevation: 0, // We'll use custom borders instead
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+
+      // Elevated button theme
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: powderBlue,
+          foregroundColor: Colors.black87,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+      ),
+
+      // FAB theme
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: powderBlue,
+        foregroundColor: Colors.black87,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
 
       // Define consistent typography scale
       textTheme: const TextTheme(

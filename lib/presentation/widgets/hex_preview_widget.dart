@@ -17,24 +17,40 @@ class HexPreviewWidget extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8),
+        // Very light background matching device list items
+        color: const Color(0xFFF5F9FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.cardBorderBlack,
+          width: 3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.cardShadowBlack,
+            offset: const Offset(3, 3),
+            blurRadius: 0,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Last Payload (hex)',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: Colors.grey.shade600,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             hexString,
-            style: technicalTheme.hexData,
+            style: technicalTheme.hexData?.copyWith(
+              color: Colors.black87,
+            ),
           ),
         ],
       ),

@@ -10,11 +10,17 @@ class MainScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BLE Live Monitor'),
-        centerTitle: true,
+        title: const Text(
+          'BLE Live Monitor',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        centerTitle: false,
+        elevation: 0,
       ),
       body: Column(
         children: [
+          const SizedBox(height: 8),
+
           // Status bar - shows connection state
           const ConnectionStatusBar(
             status: 'Disconnected',
@@ -26,10 +32,14 @@ class MainScreen extends StatelessWidget {
             hexString: '00 00 00 00 00 00 00 00',
           ),
 
+          const SizedBox(height: 8),
+
           // Chart placeholder - will be replaced with fl_chart in Milestone 6
           const Expanded(
             child: ChartPlaceholder(),
           ),
+
+          const SizedBox(height: 16),
         ],
       ),
       // FAB for starting/stopping data recording
@@ -37,8 +47,16 @@ class MainScreen extends StatelessWidget {
         onPressed: () {
           // TODO: Implement scan start/stop (Milestone 6+)
         },
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Start Scan'),
+        icon: const Icon(Icons.play_arrow, size: 24),
+        label: const Text(
+          'Start Scan',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+        elevation: 4,
       ),
     );
   }
