@@ -147,14 +147,14 @@ class ScanScreen extends ConsumerWidget {
                           );
 
                           if (success) {
-                            debugPrint('[ScanScreen] ✅ Connection successful, stopping scan and navigating');
+                            debugPrint('[ScanScreen] ✅ Connection successful, navigating to MainScreen');
                             // Navigate to main screen ONLY after successful connection
-                            await bleNotifier.stopScanning();
-                            debugPrint('[ScanScreen] Scan stopped, pushing MainScreen');
+                            // Note: Scan was already stopped during connection (BleConnectionManager:48)
+                            // so we don't need to call stopScanning() again
                             navigator.push(
                               MaterialPageRoute(builder: (_) => const MainScreen()),
                             );
-                            debugPrint('[ScanScreen] MainScreen pushed');
+                            debugPrint('[ScanScreen] ✅ Navigation to MainScreen complete');
                           } else {
                             debugPrint('[ScanScreen] ❌ Connection failed, showing error');
                             // Show error
