@@ -1,13 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/ble_connection_state.dart';
+import '../providers/ble_provider.dart';
 import '../widgets/connection_status_bar.dart';
 import '../widgets/hex_preview_widget.dart';
 import '../widgets/chart_placeholder.dart';
 
-class MainScreen extends StatelessWidget {
+class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bleState = ref.watch(bleProvider);
+
+    // Determine status text and color based on connection state
+    final String statusText;
+    final Color statusColor;
+
+    switch (bleState.connectionState) {
+      case BleConnectionState.connected:
+        statusText = 'Connected';
+        statusColor = Colors.green;
+        break;
+      case BleConnectionState.connecting:
+        statusText = 'Connecting...';
+        statusColor = Colors.orange;
+        break;
+      case BleConnectionState.reconnecting:
+        statusText = 'Reconnecting...';
+        statusColor = Colors.amber;
+        break;
+      case BleConnectionState.disconnected:
+        statusText = 'Disconnected';
+        statusColor = Colors.red;
+        break;
+      case BleConnectionState.failed:
+        statusText = 'Connection Failed';
+        statusColor = Colors.red;
+        break;
+      case BleConnectionState.scanning:
+        statusText = 'Scanning...';
+        statusColor = Colors.blue;
+        break;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -22,9 +58,9 @@ class MainScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           // Status bar - shows connection state
-          const ConnectionStatusBar(
-            status: 'Disconnected',
-            color: Colors.red,
+          ConnectionStatusBar(
+            status: statusText,
+            color: statusColor,
           ),
 
           // Hex preview - shows last received payload
