@@ -1,7 +1,7 @@
 # Masitek Flutter App - Development Milestones
 
-**Last Updated:** 2026-05-08
-**Status:** Milestone 1 Complete - Foundation & Layered Architecture
+**Last Updated:** 2026-05-13
+**Status:** Milestones 1-4 Complete, M5 Partial - Ready for Live Chart & Worker Isolate
 **Target Completion:** 90% by 2026-05-20 (2 weeks)
 
 ---
@@ -363,18 +363,19 @@ git push -u origin dev
 | Milestone | Duration | Cumulative | Status |
 |-----------|----------|------------|--------|
 | 1. Foundation | 1-2h | 2h | ✅ Complete |
-| 2. UI Scaffolding | 2-3h | 5h | ⬜ Not Started |
-| 3. BLE Scanning + Permissions | 4-5h | 10h | ⬜ Not Started |
-| 4. BLE Connection + GATT Errors | 4-5h | 15h | ⬜ Not Started |
-| 5. Data Parsing + Malformed Payloads | 3-4h | 19h | ⬜ Not Started |
+| 2. UI Scaffolding | 2-3h | 5h | ✅ Complete |
+| 3. BLE Scanning + Permissions | 4-5h | 10h | ✅ Complete |
+| 4. BLE Connection + GATT Errors | 4-5h | 15h | ✅ Complete |
+| 5. Data Parsing + Malformed Payloads | 3-4h | 19h | 🔄 Partial (hex/UTF-8 display done, formal RawSample parsing pending) |
 | 6. Live Chart | 3-4h | 23h | ⬜ Not Started |
 | 7. Worker Isolate + Scripting | 4-5h | 28h | ⬜ Not Started |
 | 8. Camera + Permission Handling | 4-5h | 33h | ⬜ Not Started |
 | 9. Persistence + Storage Checks | 3-4h | 37h | ⬜ Not Started |
-| 10. Reconnection Logic | 3-4h | 41h | ⬜ Not Started |
+| 10. Reconnection Logic | 3-4h | 41h | ⬜ Not Started (identified missing, not implemented) |
 | 11. Final Polish & Testing | 2-3h | 44h | ⬜ Not Started |
 
 **Total Estimate:** ~44 hours (2 weeks part-time or 1 week full-time + buffer)
+**Actual Progress:** ~15 hours completed (Milestones 1-4 done, M5 partial)
 
 ---
 
@@ -452,7 +453,9 @@ lib/
 │   └── exceptions/               # (empty for M1, populated in M3+)
 │
 ├── ble/                          # BLE Communication Layer (M3-M4)
-│   └── (empty - ready for scanner, connector, stream_handler)
+│   ├── ble_scanner.dart          # Device scanning
+│   ├── ble_connection_manager.dart  # Connection lifecycle
+│   └── ble_permission_handler.dart  # BLE permissions (Android SDK-branched)
 │
 ├── data/                         # Data Processing Layer (M5-M7)
 │   ├── isolate/                  # Worker isolate
@@ -462,7 +465,7 @@ lib/
 │   └── persistence/              # JSON writing
 │
 ├── services/                     # Cross-cutting services (M8)
-│   └── (empty - ready for camera, permissions, files)
+│   └── (empty - ready for camera, file services)
 │
 └── presentation/                 # Presentation Layer (M2+)
     ├── providers/                # Riverpod state management (M3+)
@@ -730,7 +733,7 @@ flutter run --debug
 
 **Duration:** 2-3 hours
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Tasks
 
@@ -1016,7 +1019,7 @@ class ChartPlaceholder extends StatelessWidget {
 
 **Duration:** 4-5 hours
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Tasks
 
@@ -1503,7 +1506,7 @@ Future<void> startScan() async {
 
 **Duration:** 4-5 hours
 
-**Status:** ⬜ Not Started
+**Status:** ✅ Complete
 
 ### Tasks
 
@@ -1912,7 +1915,7 @@ class MainScreen extends ConsumerWidget {
 
 **Duration:** 3-4 hours
 
-**Status:** ⬜ Not Started
+**Status:** 🔄 Partial Complete (hex/UTF-8 display implemented, formal RawSample parsing pending)
 
 ### Tasks
 
