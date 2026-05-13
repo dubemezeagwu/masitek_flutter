@@ -16,35 +16,33 @@ class ConnectionStatusBar extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: color.darken(0.2),
-          width: 2,
+          width: 1.5,
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 10,
-            height: 10,
+            width: 6,
+            height: 6,
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
           Text(
             status,
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.labelMedium?.copyWith(
               color: color.darken(0.4),
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
+              fontSize: 11,
             ),
           ),
         ],

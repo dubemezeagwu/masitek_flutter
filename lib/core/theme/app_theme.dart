@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 /// Centralized theme configuration for the Masitek BLE app.
 ///
 /// Defines:
-/// - Color scheme (powder blue accent with black borders)
+/// - Color scheme (teal/cyan accent - modern, tech-focused)
 /// - Typography scale (Material 3)
 /// - Custom theme extensions for technical data display
 class AppTheme {
-  // Powder blue accent color inspired by doc-sync design
-  static const Color powderBlue = Color(0xFFADD8E6);
-  static const Color powderBlueDark = Color(0xFF87CEEB);
+  // Teal/Cyan accent color scheme
+  static const Color teal = Color(0xFF009688);        // Material Teal (primary)
+  static const Color cyan = Color(0xFF00BCD4);        // Material Cyan (secondary)
   static const Color cardBorderBlack = Color(0xFF000000);
   static const Color cardShadowBlack = Color(0xFF000000);
 
@@ -17,9 +17,9 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: powderBlue,
-        primary: powderBlueDark,
-        secondary: powderBlue,
+        seedColor: teal,
+        primary: teal,
+        secondary: cyan,
       ),
       useMaterial3: true,
 
@@ -34,8 +34,8 @@ class AppTheme {
       // Elevated button theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: powderBlue,
-          foregroundColor: Colors.black87,
+          backgroundColor: teal,
+          foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -46,8 +46,8 @@ class AppTheme {
 
       // FAB theme
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: powderBlue,
-        foregroundColor: Colors.black87,
+        backgroundColor: teal,
+        foregroundColor: Colors.white,
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),

@@ -12,44 +12,39 @@ class HexPreviewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final technicalTheme = theme.extension<TechnicalTextTheme>()!;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
         // Very light background matching device list items
         color: const Color(0xFFF5F9FA),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: AppTheme.cardBorderBlack,
-          width: 3,
+          width: 2,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.cardShadowBlack,
-            offset: const Offset(3, 3),
-            blurRadius: 0,
-          ),
-        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
           Text(
-            'Last Payload (hex)',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: Colors.grey.shade700,
+            'Hex:',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: Colors.grey.shade600,
               fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            hexString,
-            style: technicalTheme.hexData?.copyWith(
-              color: Colors.black87,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              hexString,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+                color: Colors.black87,
+                fontSize: 11,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
