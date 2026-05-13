@@ -7,6 +7,39 @@ import '../../ble/ble_permission_handler.dart';
 import '../../ble/ble_scanner.dart';
 import '../../ble/ble_connection_manager.dart';
 
+/// Converts technical error messages to user-friendly messages.
+///
+/// Technical errors are still printed to debug console for debugging.
+/// Only common errors are mapped - others are simplified but kept technical.
+String _getUserFriendlyError(String technicalError) {
+  // Log technical error for debugging
+  debugPrint('[Error] Technical: $technicalError');
+
+  // Convert to lowercase for easier matching
+  final error = technicalError.toLowerCase();
+
+  // Map common errors to user-friendly messages
+  if (error.contains('permission') && error.contains('denied')) {
+    return 'Bluetooth permission needed. Please enable in Settings.';
+  } else if (error.contains('nus service not found')) {
+    return "This device isn't compatible.";
+  } else if (error.contains('tx characteristic not found')) {
+    return "Device doesn't support required features.";
+  } else if (error.contains('connection failed') || error.contains('failed to connect')) {
+    return "Couldn't connect to device. Please try again.";
+  } else if (error.contains('scan failed') || error.contains('failed to start scan')) {
+    return 'Bluetooth scan failed. Check Bluetooth is enabled.';
+  } else if (error.contains('timeout')) {
+    return 'Connection timed out. Device might be out of range.';
+  } else if (error.contains('device disconnected')) {
+    return 'Device disconnected unexpectedly.';
+  } else {
+    // For other errors, return simplified version (remove stack traces, etc.)
+    // Keep first line only
+    return technicalError.split('\n').first;
+  }
+}
+
 /// BLE state provider managing scanning, connection, and device discovery.
 ///
 /// Provides:
@@ -25,6 +58,7 @@ class BleState {
   final BluetoothDevice? connectedDevice;
   final String? errorMessage;
   final int? connectionAttempt;
+  final List<int>? lastReceivedBytes;  // Last received BLE notification bytes
 
   const BleState({
     this.connectionState = BleConnectionState.disconnected,
@@ -32,6 +66,7 @@ class BleState {
     this.connectedDevice,
     this.errorMessage,
     this.connectionAttempt,
+    this.lastReceivedBytes,
   });
 
   BleState copyWith({
@@ -40,6 +75,7 @@ class BleState {
     BluetoothDevice? connectedDevice,
     String? errorMessage,
     int? connectionAttempt,
+    List<int>? lastReceivedBytes,
   }) {
     return BleState(
       connectionState: connectionState ?? this.connectionState,
@@ -47,6 +83,7 @@ class BleState {
       connectedDevice: connectedDevice ?? this.connectedDevice,
       errorMessage: errorMessage ?? this.errorMessage,
       connectionAttempt: connectionAttempt ?? this.connectionAttempt,
+      lastReceivedBytes: lastReceivedBytes ?? this.lastReceivedBytes,
     );
   }
 }
@@ -79,7 +116,7 @@ class BleNotifier extends StateNotifier<BleState> {
       if (!granted) {
         state = state.copyWith(
           connectionState: BleConnectionState.failed,
-          errorMessage: 'BLE permissions denied. Please enable in Settings.',
+          errorMessage: _getUserFriendlyError('BLE permissions denied'),
         );
         return false;
       }
@@ -101,7 +138,7 @@ class BleNotifier extends StateNotifier<BleState> {
         onError: (error) {
           state = state.copyWith(
             connectionState: BleConnectionState.failed,
-            errorMessage: 'Scan failed: $error',
+            errorMessage: _getUserFriendlyError('Scan failed: $error'),
           );
         },
         // Note: onDone is not used here because FlutterBluePlus.scanResults
@@ -112,7 +149,7 @@ class BleNotifier extends StateNotifier<BleState> {
     } catch (e) {
       state = state.copyWith(
         connectionState: BleConnectionState.failed,
-        errorMessage: 'Failed to start scan: $e',
+        errorMessage: _getUserFriendlyError('Failed to start scan: $e'),
       );
       return false;
     }
@@ -175,7 +212,7 @@ class BleNotifier extends StateNotifier<BleState> {
       debugPrint('[Provider] ❌ Connection failed: $e');
       state = state.copyWith(
         connectionState: BleConnectionState.failed,
-        errorMessage: 'Connection failed: $e',
+        errorMessage: _getUserFriendlyError('Connection failed: $e'),
       );
       return false;
     }
@@ -191,6 +228,13 @@ class BleNotifier extends StateNotifier<BleState> {
         connectedDevice: null,
       );
     }
+  }
+
+  /// Updates the last received bytes from BLE notification.
+  ///
+  /// Called by UI layer when data is received from device.
+  void updateReceivedBytes(List<int> bytes) {
+    state = state.copyWith(lastReceivedBytes: bytes);
   }
 
   @override
