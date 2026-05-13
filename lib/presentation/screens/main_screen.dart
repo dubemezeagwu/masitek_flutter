@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/ble_connection_state.dart';
 import '../providers/ble_provider.dart';
 import '../widgets/connection_status_bar.dart';
-import '../widgets/hex_preview_widget.dart';
+import '../widgets/data_preview_row.dart';
 import '../widgets/chart_placeholder.dart';
+import '../widgets/date_time_widget.dart';
 
 class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
@@ -44,28 +45,49 @@ class MainScreen extends ConsumerWidget {
         break;
     }
 
+    // Get device name for title, fallback to default if null/empty
+    final deviceName = bleState.connectedDevice?.platformName;
+    final title = (deviceName != null && deviceName.isNotEmpty)
+        ? deviceName
+        : 'BLE Live Monitor';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'BLE Live Monitor',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         centerTitle: false,
         elevation: 0,
       ),
       body: Column(
         children: [
-          const SizedBox(height: 8),
+          // Top row: Date/time and connection status
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                // Date and time (left side)
+                const Expanded(
+                  child: DateTimeWidget(),
+                ),
 
-          // Status bar - shows connection state
-          ConnectionStatusBar(
-            status: statusText,
-            color: statusColor,
+                const SizedBox(width: 12),
+
+                // Connection status (right side)
+                ConnectionStatusBar(
+                  status: statusText,
+                  color: statusColor,
+                ),
+              ],
+            ),
           ),
 
-          // Hex preview - shows last received payload
-          const HexPreviewWidget(
-            hexString: '00 00 00 00 00 00 00 00',
+          const SizedBox(height: 4),
+
+          // Data preview - compact row showing hex and decoded message
+          DataPreviewRow(
+            bytes: bleState.lastReceivedBytes,
           ),
 
           const SizedBox(height: 8),
