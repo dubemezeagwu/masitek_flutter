@@ -1,16 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/ble_connection_state.dart';
+import '../../core/models/chart_data_point.dart';
+import '../../data/worker_isolate.dart';
 import '../providers/ble_provider.dart';
+import '../providers/chart_provider.dart';
 import '../widgets/device_list_item.dart';
 import '../widgets/date_time_widget.dart';
 import 'main_screen.dart';
 
-class ScanScreen extends ConsumerWidget {
+class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ScanScreen> createState() => _ScanScreenState();
+}
+
+class _ScanScreenState extends ConsumerState<ScanScreen> {
+  WorkerIsolate? _workerIsolate;
+
+  @override
+  void dispose() {
+    _workerIsolate?.kill();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final bleState = ref.watch(bleProvider);
     final bleNotifier = ref.read(bleProvider.notifier);
 
@@ -115,10 +131,33 @@ class ScanScreen extends ConsumerWidget {
                             return;
                           }
 
-                          // Capture navigator and messenger before async gap
+                          // Capture navigator, messenger, and chart notifier before async gap
                           final navigator = Navigator.of(context);
                           final messenger = ScaffoldMessenger.of(context);
                           final theme = Theme.of(context);
+                          final chartNotifier = ref.read(chartProvider.notifier);
+
+                          debugPrint('[ScanScreen] Spawning worker isolate...');
+
+                          // Spawn worker isolate with hardcoded transformation (M7)
+                          _workerIsolate = WorkerIsolate(
+                            onProcessedSamples: (processedSamples) {
+                              // Convert ProcessedSamples to ChartDataPoints
+                              final chartPoints = processedSamples.map((sample) {
+                                return ChartDataPoint.fromProcessedSample(
+                                  timestamp: sample.timestamp,
+                                  rawValue: sample.rawValue,
+                                  processedValue: sample.processedValue,
+                                );
+                              }).toList();
+
+                              chartNotifier.addDataPoints(chartPoints);
+                              debugPrint('[ScanScreen] ✅ Added ${chartPoints.length} processed points to chart');
+                            },
+                          );
+
+                          // Spawn isolate (transformation: processed = raw * 0.12 + 34)
+                          await _workerIsolate!.spawn();
 
                           debugPrint('[ScanScreen] Initiating connection...');
 
@@ -128,8 +167,9 @@ class ScanScreen extends ConsumerWidget {
                             onDataReceived: (bytes) {
                               // Update state with received bytes for UI display
                               bleNotifier.updateReceivedBytes(bytes);
-                              // TODO: Forward to worker isolate (Milestone 4+)
-                              debugPrint('[ScanScreen] Received ${bytes.length} bytes: $bytes');
+
+                              // Send bytes to worker isolate for processing
+                              _workerIsolate?.processBytes(bytes);
                             },
                           );
 

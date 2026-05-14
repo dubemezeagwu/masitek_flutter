@@ -4,7 +4,7 @@ import '../../core/models/ble_connection_state.dart';
 import '../providers/ble_provider.dart';
 import '../widgets/connection_status_bar.dart';
 import '../widgets/data_preview_row.dart';
-import '../widgets/chart_placeholder.dart';
+import '../widgets/live_chart.dart';
 import '../widgets/date_time_widget.dart';
 
 class MainScreen extends ConsumerWidget {
@@ -92,9 +92,9 @@ class MainScreen extends ConsumerWidget {
 
           const SizedBox(height: 8),
 
-          // Chart placeholder - will be replaced with fl_chart in Milestone 6
+          // Live chart - displays raw sensor values in real-time
           const Expanded(
-            child: ChartPlaceholder(),
+            child: LiveChart(),
           ),
 
           const SizedBox(height: 16),
