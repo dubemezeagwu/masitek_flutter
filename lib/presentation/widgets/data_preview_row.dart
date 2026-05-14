@@ -22,14 +22,31 @@ class DataPreviewRow extends StatelessWidget {
     return bytes!.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
   }
 
-  /// Decodes byte array to UTF-8 string.
+  /// Decodes byte array to UTF-8 string if it's readable text.
+  ///
+  /// Returns decoded string only if it contains printable ASCII characters.
+  /// Otherwise returns "Binary data" (e.g., for sensor values).
   String _decodeMessage() {
     if (bytes == null || bytes!.isEmpty) {
       return 'No data';
     }
 
     try {
-      return utf8.decode(bytes!);
+      final decoded = utf8.decode(bytes!, allowMalformed: true);
+
+      // Check if string contains only printable ASCII characters
+      // Printable ASCII: space (32) through tilde (126)
+      // Also allow common whitespace: tab (9), newline (10), carriage return (13)
+      final isPrintable = decoded.runes.every((rune) {
+        return (rune >= 32 && rune <= 126) || // Printable ASCII
+               rune == 9 || rune == 10 || rune == 13; // Tab, LF, CR
+      });
+
+      if (isPrintable && decoded.isNotEmpty) {
+        return decoded;
+      } else {
+        return 'Binary data';
+      }
     } catch (e) {
       return 'Binary data';
     }
@@ -58,7 +75,7 @@ class DataPreviewRow extends StatelessWidget {
         children: [
           // Hex value (left side)
           Expanded(
-            flex: 5,
+            flex: 7,
             child: Text(
               hexValue,
               style: theme.textTheme.bodySmall?.copyWith(

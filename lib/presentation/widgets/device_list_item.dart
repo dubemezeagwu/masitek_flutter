@@ -59,7 +59,7 @@ class DeviceListItem extends StatelessWidget {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             device.remoteId.toString(),
-            style: technicalTheme.deviceId?.copyWith(
+            style: technicalTheme.deviceId.copyWith(
               color: Colors.grey.shade600,
             ),
           ),
