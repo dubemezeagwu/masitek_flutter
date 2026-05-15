@@ -29,54 +29,57 @@ class DeviceListItem extends StatelessWidget {
         : 'Unknown Device';
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       decoration: BoxDecoration(
         // Very light blue background, almost white (matching doc-sync)
         color: const Color(0xFFF5F9FA),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: AppTheme.cardBorderBlack,
-          width: 3,
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.cardShadowBlack,
-            offset: const Offset(4, 4),
+            color: AppTheme.cardShadowBlack.withOpacity(0.4),
+            offset: const Offset(2, 2),
             blurRadius: 0,
           ),
         ],
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         title: Text(
           deviceName,
-          style: theme.textTheme.titleMedium?.copyWith(
+          style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w600,
             color: Colors.black87,
+            fontSize: 14,
           ),
         ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            device.remoteId.toString(),
-            style: technicalTheme.deviceId?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+        subtitle: Text(
+          device.remoteId.toString(),
+          style: technicalTheme.deviceId.copyWith(
+            color: Colors.grey.shade600,
+            fontSize: 11,
           ),
         ),
         trailing: ElevatedButton(
           onPressed: onConnect,
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 12,
+              horizontal: 14,
+              vertical: 8,
             ),
+            minimumSize: const Size(70, 32),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           child: const Text(
             'Connect',
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: Colors.black87,
+              fontSize: 12,
             ),
           ),
         ),

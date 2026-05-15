@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
 
 class ChartPlaceholder extends StatelessWidget {
   const ChartPlaceholder({super.key});
@@ -11,20 +10,13 @@ class ChartPlaceholder extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        // Very light background matching other widgets
-        color: const Color(0xFFF5F9FA),
-        borderRadius: BorderRadius.circular(12),
+        // Simple white background for data clarity
+        color: Colors.white,
+        // Simple thin black border - no fancy styling for data viz
         border: Border.all(
-          color: AppTheme.cardBorderBlack,
-          width: 3,
+          color: Colors.black,
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.cardShadowBlack,
-            offset: const Offset(4, 4),
-            blurRadius: 0,
-          ),
-        ],
       ),
       child: Center(
         child: Column(
