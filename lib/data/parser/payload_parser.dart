@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-import '../models/raw_sample.dart';
+import '../../core/models/raw_sample.dart';
 
 /// Utility for parsing 8-byte BLE payloads into RawSample objects.
 ///
