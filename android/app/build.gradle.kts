@@ -30,6 +30,11 @@ android {
         versionName = flutter.versionName
     }
 
+    lint {
+        // Bypass Play Store target SDK requirement (assessment build only)
+        disable += "ExpiredTargetSdkVersion"
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
