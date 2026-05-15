@@ -93,6 +93,9 @@ class BleNotifier extends StateNotifier<BleState> {
   StreamSubscription<List<ScanResult>>? _scanSubscription;
   StreamSubscription<List<int>>? _dataSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
+  StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
+
+  Function(List<int>)? _currentDataCallback; // Store for reconnect
 
   BleNotifier() : super(const BleState()) {
     // Listen to FlutterBluePlus scanning state to keep UI in sync
@@ -108,18 +111,16 @@ class BleNotifier extends StateNotifier<BleState> {
   /// Starts BLE scanning after checking permissions.
   ///
   /// Returns true if scanning started successfully, false otherwise.
+  /// Permission check acts as safety guard (permissions requested upfront at app launch).
   Future<bool> startScanning() async {
-    // Check permissions first
+    // Check permissions (safety guard)
     final hasPermissions = await BlePermissionHandler.checkBlePermissions();
     if (!hasPermissions) {
-      final granted = await BlePermissionHandler.requestBlePermissions();
-      if (!granted) {
-        state = state.copyWith(
-          connectionState: BleConnectionState.failed,
-          errorMessage: _getUserFriendlyError('BLE permissions denied'),
-        );
-        return false;
-      }
+      state = state.copyWith(
+        connectionState: BleConnectionState.failed,
+        errorMessage: _getUserFriendlyError('BLE permissions denied'),
+      );
+      return false;
     }
 
     // Start scanning
@@ -200,6 +201,9 @@ class BleNotifier extends StateNotifier<BleState> {
     );
 
     try {
+      // Store callback for reconnect
+      _currentDataCallback = onDataReceived;
+
       _dataSubscription = await BleConnectionManager.connectToDevice(
         device,
         onDataReceived: onDataReceived,
@@ -207,6 +211,25 @@ class BleNotifier extends StateNotifier<BleState> {
 
       debugPrint('[Provider] ✅ Connection successful, updating state to connected');
       state = state.copyWith(connectionState: BleConnectionState.connected);
+
+      // Set up connection state listener immediately after successful connection
+      _connectionStateSubscription?.cancel();
+      _connectionStateSubscription = device.connectionState.listen((connectionState) {
+        debugPrint('[Provider] 📡 Connection state changed: $connectionState');
+
+        if (connectionState == BluetoothConnectionState.disconnected) {
+          debugPrint('[Provider] ⚠️ Disconnect detected! Current app state: ${state.connectionState}');
+
+          // Only trigger reconnection if we're in connected state (not intentional disconnect)
+          if (state.connectionState == BleConnectionState.connected) {
+            debugPrint('[Provider] 🔄 Unexpected disconnect, attempting reconnection...');
+            _attemptReconnection(device);
+          } else {
+            debugPrint('[Provider] Disconnect was intentional (state: ${state.connectionState}), not reconnecting');
+          }
+        }
+      });
+
       return true;
     } catch (e) {
       debugPrint('[Provider] ❌ Connection failed: $e');
@@ -218,15 +241,59 @@ class BleNotifier extends StateNotifier<BleState> {
     }
   }
 
+  /// Attempts to reconnect after unexpected disconnect.
+  Future<void> _attemptReconnection(BluetoothDevice device) async {
+    // Guard: Prevent multiple simultaneous reconnection attempts
+    if (state.connectionState == BleConnectionState.reconnecting) {
+      debugPrint('[Provider] ⚠️ Reconnection already in progress, ignoring duplicate request');
+      return;
+    }
+
+    if (_currentDataCallback == null) {
+      debugPrint('[Provider] ⚠️ No data callback available for reconnection');
+      return;
+    }
+
+    // Update state to reconnecting
+    debugPrint('[Provider] 🔄 Starting reconnection attempt...');
+    state = state.copyWith(connectionState: BleConnectionState.reconnecting);
+
+    try {
+      debugPrint('[Provider] 🔄 Calling BleConnectionManager.reconnectToDevice()...');
+
+      _dataSubscription = await BleConnectionManager.reconnectToDevice(
+        device,
+        onDataReceived: _currentDataCallback!,
+      );
+
+      debugPrint('[Provider] ✅ Reconnection successful! Data subscription restored.');
+      debugPrint('[Provider] ✅ Updating state to connected');
+      state = state.copyWith(connectionState: BleConnectionState.connected);
+    } catch (e) {
+      debugPrint('[Provider] ❌ Reconnection failed after all attempts: $e');
+      state = state.copyWith(
+        connectionState: BleConnectionState.failed,
+        errorMessage: _getUserFriendlyError('Reconnection failed: $e'),
+      );
+    }
+  }
+
   /// Disconnects from the current device.
   Future<void> disconnect() async {
     if (state.connectedDevice != null) {
-      await _dataSubscription?.cancel();
-      await BleConnectionManager.disconnectDevice(state.connectedDevice!);
+      debugPrint('[Provider] Intentional disconnect requested');
+
+      // Set state to disconnected FIRST to prevent reconnection logic from triggering
       state = state.copyWith(
         connectionState: BleConnectionState.disconnected,
-        connectedDevice: null,
+        discoveredDevices: [], // Clear device list on disconnect
       );
+
+      await _dataSubscription?.cancel();
+      await BleConnectionManager.disconnectDevice(state.connectedDevice!);
+
+      state = state.copyWith(connectedDevice: null);
+      debugPrint('[Provider] ✅ Disconnect complete, device list cleared');
     }
   }
 
@@ -242,6 +309,7 @@ class BleNotifier extends StateNotifier<BleState> {
     _scanSubscription?.cancel();
     _dataSubscription?.cancel();
     _isScanningSubscription?.cancel();
+    _connectionStateSubscription?.cancel();
     super.dispose();
   }
 }
