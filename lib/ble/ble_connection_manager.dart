@@ -135,7 +135,6 @@ class BleConnectionManager {
 
   /// Reconnects to a device after mid-session disconnect.
   ///
-  /// Uses autoConnect: true for faster reconnection to known devices.
   /// MUST call discoverServices() again after reconnect (handles are invalidated).
   static Future<StreamSubscription<List<int>>> reconnectToDevice(
     BluetoothDevice device, {
@@ -147,7 +146,7 @@ class BleConnectionManager {
       attemptCount++;
 
       try {
-        // Reconnect with autoConnect (returns immediately for known devices)
+        // Reconnect with autoConnect: true (returns immediately for known devices, no timeout)
         await device.connect(autoConnect: true);
 
         // CRITICAL: Re-discover services after every reconnect
