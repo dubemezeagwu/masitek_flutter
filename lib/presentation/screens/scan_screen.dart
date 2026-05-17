@@ -4,9 +4,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import '../../core/models/ble_connection_state.dart';
 import '../../core/models/chart_data_point.dart';
+import '../../core/extensions/date_time_extensions.dart';
 import '../../data/isolate/worker_isolate.dart';
 import '../providers/ble_provider.dart';
-import '../providers/camera_provider.dart';
 import '../providers/chart_provider.dart';
 import '../widgets/device_list_item.dart';
 import '../widgets/date_time_widget.dart';
@@ -101,9 +101,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'BLE Device Scanner',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        title: Text(
+          DateTime.now().greeting,
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         centerTitle: false,
         elevation: 0,
@@ -221,110 +221,114 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                           ),
                         ),
                       )
-                    : ListView.builder(
-                        itemCount: bleState.discoveredDevices.length,
-                        itemBuilder: (context, index) {
-                          final result = bleState.discoveredDevices[index];
-                          return DeviceListItem(
-                            result: result,
-                            onConnect: () async {
-                          debugPrint('[ScanScreen] Connect button tapped for ${result.device.platformName}');
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Device count header
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Text(
+                              '${bleState.discoveredDevices.length} ${bleState.discoveredDevices.length == 1 ? 'device' : 'devices'} found',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          // Device list
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: bleState.discoveredDevices.length,
+                              itemBuilder: (context, index) {
+                                final result = bleState.discoveredDevices[index];
+                                return DeviceListItem(
+                                  result: result,
+                                  connectionState: bleState.connectionState,
+                                  connectingDeviceId: bleState.connectedDevice?.remoteId.toString(),
+                                  onConnect: () async {
+                                    debugPrint('[ScanScreen] Connect button tapped for ${result.device.platformName}');
 
-                          // Guard: Prevent connection if already connecting or connected
-                          if (bleState.connectionState == BleConnectionState.connecting) {
-                            debugPrint('[ScanScreen] ⚠️ Already connecting, ignoring tap');
-                            return;
-                          }
-                          if (bleState.connectionState == BleConnectionState.connected) {
-                            debugPrint('[ScanScreen] ⚠️ Already connected, ignoring tap');
-                            return;
-                          }
+                                    // Guard: Prevent connection if already connecting or connected
+                                    if (bleState.connectionState == BleConnectionState.connecting) {
+                                      debugPrint('[ScanScreen] ⚠️ Already connecting, ignoring tap');
+                                      return;
+                                    }
+                                    if (bleState.connectionState == BleConnectionState.connected) {
+                                      debugPrint('[ScanScreen] ⚠️ Already connected, ignoring tap');
+                                      return;
+                                    }
 
-                          // Capture messenger, chart notifier, and camera notifier before async gap
-                          final messenger = ScaffoldMessenger.of(context);
-                          final theme = Theme.of(context);
-                          final chartNotifier = ref.read(chartProvider.notifier);
-                          final cameraNotifier = ref.read(cameraProvider.notifier);
+                                    // Capture messenger and chart notifier before async gap
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    final theme = Theme.of(context);
+                                    final chartNotifier = ref.read(chartProvider.notifier);
 
-                          debugPrint('[ScanScreen] Spawning worker isolate...');
+                                    debugPrint('[ScanScreen] Spawning worker isolate...');
 
-                          // Spawn worker isolate with hardcoded transformation (M7)
-                          _workerIsolate = WorkerIsolate(
-                            onProcessedSamples: (processedSamples) {
-                              // Convert ProcessedSamples to ChartDataPoints
-                              final chartPoints = processedSamples.map((sample) {
-                                return ChartDataPoint.fromProcessedSample(
-                                  timestamp: sample.timestamp,
-                                  rawValue: sample.rawValue,
-                                  processedValue: sample.processedValue,
+                                    // Spawn worker isolate with hardcoded transformation (M7)
+                                    _workerIsolate = WorkerIsolate(
+                                      onProcessedSamples: (processedSamples) {
+                                        // Convert ProcessedSamples to ChartDataPoints
+                                        final chartPoints = processedSamples.map((sample) {
+                                          return ChartDataPoint.fromProcessedSample(
+                                            timestamp: sample.timestamp,
+                                            rawValue: sample.rawValue,
+                                            processedValue: sample.processedValue,
+                                          );
+                                        }).toList();
+
+                                        chartNotifier.addDataPoints(chartPoints);
+                                        debugPrint('[ScanScreen] ✅ Added ${chartPoints.length} processed points to chart');
+                                      },
+                                    );
+
+                                    // Spawn isolate (transformation: processed = raw * 0.12 + 34)
+                                    await _workerIsolate!.spawn();
+
+                                    debugPrint('[ScanScreen] Initiating connection...');
+
+                                    // Connect to device
+                                    final success = await bleNotifier.connectToDevice(
+                                      result.device,
+                                      onDataReceived: (bytes) {
+                                        // Update state with received bytes for UI display
+                                        bleNotifier.updateReceivedBytes(bytes);
+
+                                        // Send bytes to worker isolate for processing
+                                        _workerIsolate?.processBytes(bytes);
+                                      },
+                                    );
+
+                                    if (success) {
+                                      debugPrint('[ScanScreen] ✅ Connection successful');
+                                      // Show success message - user can now click "Go to Session" button
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: const Text('Connected! Click "Go to Session" to start recording.'),
+                                          backgroundColor: Colors.green,
+                                          duration: const Duration(seconds: 3),
+                                        ),
+                                      );
+                                    } else {
+                                      debugPrint('[ScanScreen] ❌ Connection failed, showing error');
+                                      // Show error
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            bleState.errorMessage ?? 'Connection failed',
+                                          ),
+                                          backgroundColor: theme.colorScheme.error,
+                                        ),
+                                      );
+                                    }
+                                  },
                                 );
-                              }).toList();
-
-                              chartNotifier.addDataPoints(chartPoints);
-                              debugPrint('[ScanScreen] ✅ Added ${chartPoints.length} processed points to chart');
-                            },
-                          );
-
-                          // Spawn isolate (transformation: processed = raw * 0.12 + 34)
-                          await _workerIsolate!.spawn();
-
-                          // Initialize camera (back camera for recording)
-                          debugPrint('[ScanScreen] Initializing camera...');
-                          final cameraInitialized = await cameraNotifier.initialize();
-                          if (!cameraInitialized) {
-                            debugPrint('[ScanScreen] ⚠️ Camera initialization failed (permission denied or unavailable)');
-                            // Show warning but continue - BLE works independently
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: const Text('Camera unavailable - recording disabled'),
-                                backgroundColor: Colors.orange,
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
-                          } else {
-                            debugPrint('[ScanScreen] ✅ Camera initialized successfully');
-                          }
-
-                          debugPrint('[ScanScreen] Initiating connection...');
-
-                          // Connect to device
-                          final success = await bleNotifier.connectToDevice(
-                            result.device,
-                            onDataReceived: (bytes) {
-                              // Update state with received bytes for UI display
-                              bleNotifier.updateReceivedBytes(bytes);
-
-                              // Send bytes to worker isolate for processing
-                              _workerIsolate?.processBytes(bytes);
-                            },
-                          );
-
-                          if (success) {
-                            debugPrint('[ScanScreen] ✅ Connection successful');
-                            // Show success message - user can now click "Go to Session" button
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: const Text('Connected! Click "Go to Session" to start recording.'),
-                                backgroundColor: Colors.green,
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
-                          } else {
-                            debugPrint('[ScanScreen] ❌ Connection failed, showing error');
-                            // Show error
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  bleState.errorMessage ?? 'Connection failed',
-                                ),
-                                backgroundColor: theme.colorScheme.error,
-                              ),
-                            );
-                          }
-                        },
-                      );
-                    },
-                  ),
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
           ),
         ],
       ),
