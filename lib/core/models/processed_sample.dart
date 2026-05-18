@@ -1,18 +1,11 @@
-/// Output of scripting engine applied to a RawSample.
-///
-/// Contains both the original raw value and the processed result
-/// from running the JavaScript transformation script.
+// output of scripting engine applied to a RawSample.
+// contains both the original raw value and the processed result
+// from running the transformation script.
+
 class ProcessedSample {
-  /// Channel identifier (copied from RawSample)
   final int channel;
-
-  /// Original raw sensor value (int16)
   final int rawValue;
-
-  /// Processed value after script transformation (double)
   final double processedValue;
-
-  /// Timestamp when sample was received
   final DateTime timestamp;
 
   const ProcessedSample({
@@ -22,7 +15,7 @@ class ProcessedSample {
     required this.timestamp,
   });
 
-  /// Creates from RawSample with script result
+  // creates from RawSample with script result
   factory ProcessedSample.fromRawSample({
     required int channel,
     required int rawValue,
@@ -37,7 +30,6 @@ class ProcessedSample {
     );
   }
 
-  /// Converts to JSON for persistence
   Map<String, dynamic> toJson() {
     return {
       'timestamp': timestamp.toIso8601String(),
@@ -47,15 +39,15 @@ class ProcessedSample {
     };
   }
 
-  /// Creates from JSON (for loading saved data)
-  factory ProcessedSample.fromJson(Map<String, dynamic> json) {
-    return ProcessedSample(
-      channel: json['channel'] as int,
-      rawValue: json['rawValue'] as int,
-      processedValue: (json['processedValue'] as num).toDouble(),
-      timestamp: DateTime.parse(json['timestamp'] as String),
-    );
-  }
+  // creates from JSON (for loading saved data; future feature)
+  // factory ProcessedSample.fromJson(Map<String, dynamic> json) {
+  //   return ProcessedSample(
+  //     channel: json['channel'] as int,
+  //     rawValue: json['rawValue'] as int,
+  //     processedValue: (json['processedValue'] as num).toDouble(),
+  //     timestamp: DateTime.parse(json['timestamp'] as String),
+  //   );
+  // }
 
   @override
   String toString() {

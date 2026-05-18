@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/models/ble_connection_state.dart';
+import '../../core/extensions/rssi_extensions.dart';
 
 /// Reusable widget for displaying a discovered BLE device in a list.
 ///
@@ -8,81 +9,136 @@ import '../../core/theme/app_theme.dart';
 /// Takes a ScanResult from flutter_blue_plus and displays:
 /// - Device name (or "Unknown Device" if empty)
 /// - Device MAC address
-/// - "Connect" button
+/// - Signal strength indicator (RSSI-based)
+/// - "Connect" button with loading state
 class DeviceListItem extends StatelessWidget {
   final ScanResult result;
   final VoidCallback onConnect;
+  final BleConnectionState connectionState;
+  final String? connectingDeviceId;
 
   const DeviceListItem({
     super.key,
     required this.result,
     required this.onConnect,
+    required this.connectionState,
+    this.connectingDeviceId,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final technicalTheme = theme.extension<TechnicalTextTheme>()!;
     final device = result.device;
     final deviceName = device.platformName.isNotEmpty
         ? device.platformName
         : 'Unknown Device';
 
+    // Check if THIS device is currently being connected to
+    final isConnecting = connectionState == BleConnectionState.connecting &&
+        connectingDeviceId == device.remoteId.toString();
+
+    // Get signal strength metrics using RSSI extension
+    final rssi = result.rssi;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      decoration: BoxDecoration(
-        // Very light blue background, almost white (matching doc-sync)
-        color: const Color(0xFFF5F9FA),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppTheme.cardBorderBlack,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.cardShadowBlack.withOpacity(0.4),
-            offset: const Offset(2, 2),
-            blurRadius: 0,
+      color: Colors.white,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            dense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            onTap: isConnecting ? null : onConnect,
+            // Signal strength indicator (left side)
+            leading: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  rssi.signalIcon,
+                  color: rssi.signalColor,
+                  size: 24,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$rssi dBm',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            title: Text(
+              deviceName,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+                fontSize: 14,
+              ),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  device.remoteId.toString(),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: Colors.grey.shade600,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  rssi.proximityLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: rssi.signalColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            trailing: isConnecting
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Connecting...',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    'Connect',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.grey.shade300,
+            indent: 16,
+            endIndent: 16,
           ),
         ],
-      ),
-      child: ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        title: Text(
-          deviceName,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-            fontSize: 14,
-          ),
-        ),
-        subtitle: Text(
-          device.remoteId.toString(),
-          style: technicalTheme.deviceId.copyWith(
-            color: Colors.grey.shade600,
-            fontSize: 11,
-          ),
-        ),
-        trailing: ElevatedButton(
-          onPressed: onConnect,
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 8,
-            ),
-            minimumSize: const Size(70, 32),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: const Text(
-            'Connect',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-              fontSize: 12,
-            ),
-          ),
-        ),
       ),
     );
   }

@@ -1,15 +1,11 @@
-/// Single decoded sensor reading from BLE payload.
-///
-/// Represents one sample extracted from the 8-byte BLE notification.
-/// Each notification contains exactly 2 samples.
+// single decoded sensor reading from BLE payload.
+// Represents one sample extracted from the 8-byte BLE notification.
+// each notification contains exactly 2 samples.
+
 class RawSample {
-  /// Channel identifier (uint16, typically fixed at 1)
+  // channel identifier (uint16, typically fixed at 1)
   final int channel;
-
-  /// Scaled sensor value (int16, can be negative)
   final int value;
-
-  /// Timestamp when sample was received
   final DateTime timestamp;
 
   const RawSample({
@@ -18,23 +14,22 @@ class RawSample {
     required this.timestamp,
   });
 
-  /// Converts sample to JSON format for persistence.
-  Map<String, dynamic> toJson() {
-    return {
-      'timestamp': timestamp.toIso8601String(),
-      'channel': channel,
-      'value': value,
-    };
-  }
+  // Map<String, dynamic> toJson() {
+  //   return {
+  //     'timestamp': timestamp.toIso8601String(),
+  //     'channel': channel,
+  //     'value': value,
+  //   };
+  // }
 
-  /// Creates sample from JSON (for loading saved data).
-  factory RawSample.fromJson(Map<String, dynamic> json) {
-    return RawSample(
-      channel: json['channel'] as int,
-      value: json['value'] as int,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-    );
-  }
+  // creates sample from JSON (for loading saved data; future feat).
+  // factory RawSample.fromJson(Map<String, dynamic> json) {
+  //   return RawSample(
+  //     channel: json['channel'] as int,
+  //     value: json['value'] as int,
+  //     timestamp: DateTime.parse(json['timestamp'] as String),
+  //   );
+  // }
 
   @override
   String toString() {

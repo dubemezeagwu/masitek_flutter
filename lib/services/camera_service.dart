@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -33,19 +32,16 @@ class CameraService {
   /// Permission check acts as safety guard (permissions requested upfront at app launch).
   Future<bool> initialize() async {
     try {
-      debugPrint('[CameraService] Initializing camera...');
 
       // Check camera permission (safety guard)
       final permissionStatus = await Permission.camera.status;
       if (!permissionStatus.isGranted) {
-        debugPrint('[CameraService] ❌ Camera permission not granted');
         return false;
       }
 
       // Get available cameras
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) {
-        debugPrint('[CameraService] ❌ No cameras available on device');
         return false;
       }
 
@@ -55,7 +51,6 @@ class CameraService {
         orElse: () => _cameras!.first, // Fallback to first available camera
       );
 
-      debugPrint('[CameraService] Using camera: ${backCamera.name} (${backCamera.lensDirection})');
 
       // Initialize controller with lower resolution to reduce file size
       // medium = ~480p = ~10-15 MB/min (vs high = ~720p = ~60 MB/min)
@@ -69,10 +64,8 @@ class CameraService {
       await _controller!.initialize();
       _isInitialized = true;
 
-      debugPrint('[CameraService] ✅ Camera initialized successfully');
       return true;
     } catch (e) {
-      debugPrint('[CameraService] ❌ Camera initialization failed: $e');
       _isInitialized = false;
       return false;
     }
@@ -84,23 +77,18 @@ class CameraService {
   /// Throws [CameraException] if camera not initialized or already recording.
   Future<bool> startRecording() async {
     if (!_isInitialized || _controller == null) {
-      debugPrint('[CameraService] ❌ Cannot start recording: camera not initialized');
       return false;
     }
 
     if (_isRecording) {
-      debugPrint('[CameraService] ⚠️ Already recording, ignoring duplicate start request');
       return false;
     }
 
     try {
-      debugPrint('[CameraService] Starting video recording...');
       await _controller!.startVideoRecording();
       _isRecording = true;
-      debugPrint('[CameraService] ✅ Recording started');
       return true;
     } catch (e) {
-      debugPrint('[CameraService] ❌ Failed to start recording: $e');
       _isRecording = false;
       return false;
     }
@@ -112,22 +100,18 @@ class CameraService {
   /// File is saved to app's temporary directory initially, then moved to Downloads.
   Future<String?> stopRecording() async {
     if (!_isRecording || _controller == null) {
-      debugPrint('[CameraService] ⚠️ No recording in progress');
       return null;
     }
 
     try {
-      debugPrint('[CameraService] Stopping video recording...');
       final videoFile = await _controller!.stopVideoRecording();
       _isRecording = false;
 
       // Move file to Downloads directory with timestamped name
       final movedFilePath = await _moveToDownloads(videoFile.path);
 
-      debugPrint('[CameraService] ✅ Recording stopped, file saved: $movedFilePath');
       return movedFilePath;
     } catch (e) {
-      debugPrint('[CameraService] ❌ Failed to stop recording: $e');
       _isRecording = false;
       return null;
     }
@@ -156,7 +140,6 @@ class CameraService {
       final Directory? externalDir = await getExternalStorageDirectory();
 
       if (externalDir == null) {
-        debugPrint('[CameraService] ⚠️ Could not access external storage, keeping in temp');
         return tempPath;
       }
 
@@ -176,10 +159,8 @@ class CameraService {
       // Delete temp file
       await tempFile.delete();
 
-      debugPrint('[CameraService] ✅ Video saved to: $finalPath');
       return finalFile.path;
     } catch (e) {
-      debugPrint('[CameraService] ⚠️ Failed to move file: $e, keeping temp file');
       return tempPath;
     }
   }
@@ -195,9 +176,7 @@ class CameraService {
       await _controller?.dispose();
       _controller = null;
       _isInitialized = false;
-      debugPrint('[CameraService] ✅ Camera disposed');
     } catch (e) {
-      debugPrint('[CameraService] ⚠️ Error disposing camera: $e');
     }
   }
 

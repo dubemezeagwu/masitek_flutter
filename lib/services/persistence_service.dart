@@ -37,16 +37,13 @@ class PersistenceService {
     required DateTime endTime,
   }) async {
     try {
-      debugPrint('[PersistenceService] Saving ${samples.length} samples...');
 
       // Generate filename with timestamp
       final filename = _generateFilename(startTime);
-      debugPrint('[PersistenceService] Filename: $filename');
 
       // Get Downloads directory path
       final filePath = await _getDownloadsPath(filename);
       if (filePath == null) {
-        debugPrint('[PersistenceService] ❌ Could not access Downloads directory');
         return null;
       }
 
@@ -67,12 +64,9 @@ class PersistenceService {
       final file = File(filePath);
       await file.writeAsString(jsonString);
 
-      debugPrint('[PersistenceService] ✅ Session data saved: $filePath');
-      debugPrint('[PersistenceService] File size: ${(await file.length() / 1024).toStringAsFixed(2)} KB');
 
       return filePath;
     } catch (e) {
-      debugPrint('[PersistenceService] ❌ Failed to save session data: $e');
       return null;
     }
   }
@@ -87,7 +81,6 @@ class PersistenceService {
     required DateTime endTime,
   }) async {
     try {
-      debugPrint('[PersistenceService] Using compute isolate for ${samples.length} samples...');
 
       // Run serialization in compute isolate
       final result = await compute(_saveSessionDataIsolate, {
@@ -97,14 +90,11 @@ class PersistenceService {
       });
 
       if (result == null) {
-        debugPrint('[PersistenceService] ❌ Compute isolate returned null');
         return null;
       }
 
-      debugPrint('[PersistenceService] ✅ Large dataset saved successfully');
       return result;
     } catch (e) {
-      debugPrint('[PersistenceService] ❌ Failed to save large dataset: $e');
       return null;
     }
   }
@@ -133,13 +123,11 @@ class PersistenceService {
       // Get external storage directory
       final Directory? externalDir = await getExternalStorageDirectory();
       if (externalDir == null) {
-        debugPrint('[PersistenceService] ⚠️ Could not access external storage');
         return false; // Conservative: assume not enough space if can't check
       }
 
       // TEMPORARY: Skip actual check since Dart's FileStat doesn't provide free space
       // In production, this would use a platform channel to call Android's StatFs
-      debugPrint('[PersistenceService] ⚠️ Storage check temporarily disabled (always returns true)');
       return true;
 
       // TODO: Implement proper storage check via platform channel
@@ -148,7 +136,6 @@ class PersistenceService {
       // final int freeBytes = await channel.invokeMethod('getFreeSpace');
       // return freeBytes >= minStorageBytes;
     } catch (e) {
-      debugPrint('[PersistenceService] ⚠️ Error checking storage: $e');
       return true; // Optimistic: allow recording if check fails
     }
   }
@@ -212,7 +199,6 @@ class PersistenceService {
 
       return '$sessionsPath/$filename';
     } catch (e) {
-      debugPrint('[PersistenceService] ⚠️ Error getting Sessions path: $e');
       return null;
     }
   }
@@ -223,7 +209,6 @@ class PersistenceService {
   /// Useful for cleanup/maintenance.
   static Future<int> cleanupOldSessions({int daysToKeep = 7}) async {
     try {
-      debugPrint('[PersistenceService] Cleaning up sessions older than $daysToKeep days...');
 
       final Directory? externalDir = await getExternalStorageDirectory();
       if (externalDir == null) {
@@ -250,16 +235,13 @@ class PersistenceService {
             if (stat.modified.isBefore(cutoffDate)) {
               await entity.delete();
               deletedCount++;
-              debugPrint('[PersistenceService] Deleted: $filename');
             }
           }
         }
       }
 
-      debugPrint('[PersistenceService] ✅ Cleanup complete: $deletedCount files deleted');
       return deletedCount;
     } catch (e) {
-      debugPrint('[PersistenceService] ⚠️ Error during cleanup: $e');
       return 0;
     }
   }

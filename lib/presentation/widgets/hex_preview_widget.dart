@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
 
 class HexPreviewWidget extends StatelessWidget {
   final String hexString;
@@ -18,11 +17,10 @@ class HexPreviewWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        // Very light background matching device list items
         color: const Color(0xFFF5F9FA),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: AppTheme.cardBorderBlack,
+          color: Colors.black,
           width: 2,
         ),
       ),

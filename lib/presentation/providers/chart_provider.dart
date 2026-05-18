@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/chart_data_point.dart';
+import '../../core/constants/ble_constants.dart';
+import 'performance_provider.dart';
 
 /// Maximum number of data points to keep in buffer.
 /// Allows panning back through historical data.
 /// Memory: ~1000 points = ~32KB (negligible overhead)
-const int kMaxChartPoints = 1000;
+const int kMaxChartPoints = BLEConstants.maxChartPoints;
 
 /// State holding chart data with rolling window.
 class ChartState {
@@ -42,7 +44,9 @@ class ChartState {
 
 /// Notifier managing chart data state.
 class ChartNotifier extends StateNotifier<ChartState> {
-  ChartNotifier() : super(const ChartState.initial());
+  final Ref ref;
+
+  ChartNotifier(this.ref) : super(const ChartState.initial());
 
   /// Adds a new data point to the chart.
   ///
@@ -100,6 +104,9 @@ class ChartNotifier extends StateNotifier<ChartState> {
       dataPoints: updatedPoints,
       nextSampleIndex: currentIndex,
     );
+
+    // Track chart render for performance metrics
+    ref.read(performanceProvider.notifier).recordChartRender();
   }
 
   /// Clears all chart data (e.g., on disconnect or new session).
@@ -110,5 +117,5 @@ class ChartNotifier extends StateNotifier<ChartState> {
 
 /// Provider for chart data state.
 final chartProvider = StateNotifierProvider<ChartNotifier, ChartState>((ref) {
-  return ChartNotifier();
+  return ChartNotifier(ref);
 });

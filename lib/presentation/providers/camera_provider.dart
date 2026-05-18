@@ -1,5 +1,4 @@
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/camera_service.dart';
 
@@ -53,7 +52,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
   ///
   /// Returns true if successful, false if camera unavailable or permission denied.
   Future<bool> initialize() async {
-    debugPrint('[CameraProvider] Initializing camera...');
 
     final success = await _cameraService.initialize();
 
@@ -63,13 +61,11 @@ class CameraNotifier extends StateNotifier<CameraState> {
         controller: _cameraService.controller,
         errorMessage: null,
       );
-      debugPrint('[CameraProvider] ✅ Camera initialized successfully');
     } else {
       state = state.copyWith(
         isInitialized: false,
         errorMessage: 'Camera unavailable or permission denied',
       );
-      debugPrint('[CameraProvider] ❌ Camera initialization failed');
     }
 
     return success;
@@ -80,17 +76,14 @@ class CameraNotifier extends StateNotifier<CameraState> {
   /// Returns true if recording started successfully, false otherwise.
   Future<bool> startRecording() async {
     if (!state.isInitialized) {
-      debugPrint('[CameraProvider] ⚠️ Cannot start recording: camera not initialized');
       state = state.copyWith(errorMessage: 'Camera not initialized');
       return false;
     }
 
     if (state.isRecording) {
-      debugPrint('[CameraProvider] ⚠️ Already recording, ignoring duplicate request');
       return false;
     }
 
-    debugPrint('[CameraProvider] Starting video recording...');
     final success = await _cameraService.startRecording();
 
     if (success) {
@@ -98,12 +91,10 @@ class CameraNotifier extends StateNotifier<CameraState> {
         isRecording: true,
         errorMessage: null,
       );
-      debugPrint('[CameraProvider] ✅ Recording started');
     } else {
       state = state.copyWith(
         errorMessage: 'Failed to start recording',
       );
-      debugPrint('[CameraProvider] ❌ Failed to start recording');
     }
 
     return success;
@@ -114,11 +105,9 @@ class CameraNotifier extends StateNotifier<CameraState> {
   /// Returns null if no recording in progress or stop failed.
   Future<String?> stopRecording() async {
     if (!state.isRecording) {
-      debugPrint('[CameraProvider] ⚠️ No recording in progress');
       return null;
     }
 
-    debugPrint('[CameraProvider] Stopping video recording...');
     final filePath = await _cameraService.stopRecording();
 
     state = state.copyWith(
@@ -127,9 +116,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
     );
 
     if (filePath != null) {
-      debugPrint('[CameraProvider] ✅ Recording stopped, file saved: $filePath');
     } else {
-      debugPrint('[CameraProvider] ❌ Failed to stop recording');
     }
 
     return filePath;
@@ -137,7 +124,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
 
   /// Disposes camera controller and releases resources.
   Future<void> disposeCamera() async {
-    debugPrint('[CameraProvider] Disposing camera...');
     await _cameraService.dispose();
 
     state = state.copyWith(
@@ -146,7 +132,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
       controller: null,
     );
 
-    debugPrint('[CameraProvider] ✅ Camera disposed');
   }
 
   @override
