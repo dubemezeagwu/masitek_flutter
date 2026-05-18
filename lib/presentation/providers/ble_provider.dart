@@ -107,7 +107,6 @@ class BleNotifier extends StateNotifier<BleState> {
     _isScanningSubscription = FlutterBluePlus.isScanning.listen((isScanning) {
       // If scan stopped but our state still shows scanning, reset it
       if (!isScanning && state.connectionState == BleConnectionState.scanning) {
-        debugPrint('[Provider] Scan completed, resetting state to disconnected');
         state = state.copyWith(connectionState: BleConnectionState.disconnected);
       }
     });
@@ -122,7 +121,6 @@ class BleNotifier extends StateNotifier<BleState> {
   Future<bool> startScanning() async {
     // Guard: If already scanning, stop current scan first (double-tap handling)
     if (state.connectionState == BleConnectionState.scanning) {
-      debugPrint('[Provider] Scan already running - restarting scan with fresh state');
       await _stopScanningInternal();
       // Small delay to ensure clean stop
       await Future.delayed(const Duration(milliseconds: 100));
@@ -205,18 +203,11 @@ class BleNotifier extends StateNotifier<BleState> {
     required Function(List<int> bytes) onDataReceived,
   }) async {
     // Guard: Prevent multiple simultaneous connection attempts
-    if (state.connectionState == BleConnectionState.connecting) {
-      debugPrint('[Provider] ⚠️ Connection already in progress, ignoring duplicate request');
+    if (state.connectionState == BleConnectionState.connecting ||
+        state.connectionState == BleConnectionState.connected) {
       return false;
     }
 
-    // Guard: Prevent connecting while already connected
-    if (state.connectionState == BleConnectionState.connected) {
-      debugPrint('[Provider] ⚠️ Already connected to a device, ignoring duplicate request');
-      return false;
-    }
-
-    debugPrint('[Provider] Starting connection to ${device.platformName}');
     state = state.copyWith(
       connectionState: BleConnectionState.connecting,
       connectedDevice: device,
@@ -240,24 +231,17 @@ class BleNotifier extends StateNotifier<BleState> {
       // Set up connection state listener immediately after successful connection
       _connectionStateSubscription?.cancel();
       _connectionStateSubscription = device.connectionState.listen((connectionState) {
-        debugPrint('[Provider] 📡 Connection state changed: $connectionState');
-
         if (connectionState == BluetoothConnectionState.disconnected) {
-          debugPrint('[Provider] ⚠️ Disconnect detected! Current app state: ${state.connectionState}');
-
           // Only trigger reconnection if we're in connected state (not intentional disconnect)
           if (state.connectionState == BleConnectionState.connected) {
-            debugPrint('[Provider] 🔄 Unexpected disconnect, attempting reconnection...');
+            debugPrint('[Provider] Unexpected disconnect, reconnecting...');
             _attemptReconnection(device);
-          } else {
-            debugPrint('[Provider] Disconnect was intentional (state: ${state.connectionState}), not reconnecting');
           }
         }
       });
 
       return true;
     } catch (e) {
-      debugPrint('[Provider] ❌ Connection failed: $e');
       state = state.copyWith(
         connectionState: BleConnectionState.failed,
         errorMessage: _getUserFriendlyError('Connection failed: $e'),
@@ -270,33 +254,28 @@ class BleNotifier extends StateNotifier<BleState> {
   Future<void> _attemptReconnection(BluetoothDevice device) async {
     // Guard: Prevent multiple simultaneous reconnection attempts
     if (state.connectionState == BleConnectionState.reconnecting) {
-      debugPrint('[Provider] ⚠️ Reconnection already in progress, ignoring duplicate request');
       return;
     }
 
     if (_currentDataCallback == null) {
-      debugPrint('[Provider] ⚠️ No data callback available for reconnection');
       return;
     }
 
-    // Update state to reconnecting
-    debugPrint('[Provider] 🔄 Starting reconnection attempt...');
     state = state.copyWith(connectionState: BleConnectionState.reconnecting);
 
     try {
-      debugPrint('[Provider] 🔄 Calling BleConnectionManager.reconnectToDevice()...');
-
       _dataSubscription = await BleConnectionManager.reconnectToDevice(
         device,
         onDataReceived: _currentDataCallback!,
       );
 
+      debugPrint('[Provider] ✅ Reconnected successfully');
       state = state.copyWith(connectionState: BleConnectionState.connected);
 
       // Restart RSSI polling after successful reconnection
       _startRssiPolling();
     } catch (e) {
-      debugPrint('[Provider] ❌ Reconnection failed after all attempts: $e');
+      debugPrint('[Provider] ❌ Reconnection failed: $e');
       state = state.copyWith(
         connectionState: BleConnectionState.failed,
         errorMessage: _getUserFriendlyError('Reconnection failed: $e'),
@@ -307,8 +286,6 @@ class BleNotifier extends StateNotifier<BleState> {
   /// Disconnects from the current device.
   Future<void> disconnect() async {
     if (state.connectedDevice != null) {
-      debugPrint('[Provider] Intentional disconnect requested');
-
       // Stop RSSI polling
       _stopRssiPolling();
 
@@ -345,7 +322,7 @@ class BleNotifier extends StateNotifier<BleState> {
           final rssi = await device.readRssi();
           state = state.copyWith(currentRssi: rssi);
         } catch (e) {
-          debugPrint('[Provider] ⚠️ Failed to read RSSI: $e');
+          // Silently fail RSSI read
         }
       }
     });
@@ -364,7 +341,6 @@ class BleNotifier extends StateNotifier<BleState> {
   ///
   /// Called from lifecycle observer (saves battery).
   void pauseRssiPolling() {
-    debugPrint('[Provider] ⏸️ Pausing RSSI polling (app backgrounded)');
     _rssiTimer?.cancel();
     _rssiTimer = null;
     // Keep currentRssi value (don't reset to 0)
@@ -376,7 +352,6 @@ class BleNotifier extends StateNotifier<BleState> {
   void resumeRssiPolling() {
     // Only resume if we're connected
     if (state.connectionState == BleConnectionState.connected) {
-      debugPrint('[Provider] ▶️ Resuming RSSI polling (app foregrounded)');
       _startRssiPolling();
     }
   }

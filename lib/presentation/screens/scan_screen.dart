@@ -63,12 +63,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       // Request all at once
       final allPermissions = [...blePermissions, cameraPermission, microphonePermission];
       await allPermissions.request();
-
-      // Note: No error handling here - individual operations will check
-      // permissions again and show specific error messages if needed
-      debugPrint('[ScanScreen] ✅ Upfront permission request completed');
     } catch (e) {
-      debugPrint('[ScanScreen] ⚠️ Error requesting permissions: $e');
       // Continue anyway - safety checks will catch this later
     }
   }
@@ -154,13 +149,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                   : 'Unknown Device',
               currentRssi: bleState.currentRssi,
               onDisconnect: () async {
-                debugPrint('[ScanScreen] Disconnect button tapped');
                 await bleNotifier.disconnect();
-                // Clear device list after disconnect
-                debugPrint('[ScanScreen] Connection closed, device list will be cleared on next scan');
               },
               onReturnToSession: () {
-                debugPrint('[ScanScreen] Go to Session button tapped');
                 // Navigate to MainScreen with existing worker isolate
                 if (_workerIsolate != null) {
                   Navigator.push(
@@ -172,7 +163,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     ),
                   );
                 } else {
-                  debugPrint('[ScanScreen] ⚠️ Worker isolate not available');
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Session not ready. Please reconnect.'),
@@ -244,15 +234,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                   connectionState: bleState.connectionState,
                                   connectingDeviceId: bleState.connectedDevice?.remoteId.toString(),
                                   onConnect: () async {
-                                    debugPrint('[ScanScreen] Connect button tapped for ${result.device.platformName}');
-
                                     // Guard: Prevent connection if already connecting or connected
-                                    if (bleState.connectionState == BleConnectionState.connecting) {
-                                      debugPrint('[ScanScreen] ⚠️ Already connecting, ignoring tap');
-                                      return;
-                                    }
-                                    if (bleState.connectionState == BleConnectionState.connected) {
-                                      debugPrint('[ScanScreen] ⚠️ Already connected, ignoring tap');
+                                    if (bleState.connectionState == BleConnectionState.connecting ||
+                                        bleState.connectionState == BleConnectionState.connected) {
                                       return;
                                     }
 
@@ -260,8 +244,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                     final messenger = ScaffoldMessenger.of(context);
                                     final theme = Theme.of(context);
                                     final chartNotifier = ref.read(chartProvider.notifier);
-
-                                    debugPrint('[ScanScreen] Spawning worker isolate...');
 
                                     // Spawn worker isolate with hardcoded transformation (M7)
                                     _workerIsolate = WorkerIsolate(
@@ -276,14 +258,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                         }).toList();
 
                                         chartNotifier.addDataPoints(chartPoints);
-                                        debugPrint('[ScanScreen] ✅ Added ${chartPoints.length} processed points to chart');
                                       },
                                     );
 
                                     // Spawn isolate (transformation: processed = raw * 0.12 + 34)
                                     await _workerIsolate!.spawn();
-
-                                    debugPrint('[ScanScreen] Initiating connection...');
 
                                     // Connect to device
                                     final success = await bleNotifier.connectToDevice(
@@ -298,7 +277,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                     );
 
                                     if (success) {
-                                      debugPrint('[ScanScreen] ✅ Connection successful');
                                       // Show success message - user can now click "Go to Session" button
                                       messenger.showSnackBar(
                                         SnackBar(
@@ -308,7 +286,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                         ),
                                       );
                                     } else {
-                                      debugPrint('[ScanScreen] ❌ Connection failed, showing error');
                                       // Show error
                                       messenger.showSnackBar(
                                         SnackBar(

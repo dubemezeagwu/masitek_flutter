@@ -48,11 +48,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
 
   /// Initialize camera for recording
   Future<void> _initializeCamera() async {
-    debugPrint('[MainScreen] Initializing camera...');
     final cameraInitialized = await _cameraNotifier!.initialize();
 
     if (!cameraInitialized) {
-      debugPrint('[MainScreen] ⚠️ Camera initialization failed (permission denied or unavailable)');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -62,8 +60,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           ),
         );
       }
-    } else {
-      debugPrint('[MainScreen] ✅ Camera initialized successfully');
     }
   }
 
@@ -74,25 +70,20 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
 
     // Dispose camera to release resources when leaving screen
     // Use captured notifier reference (safe to call during dispose)
-    debugPrint('[MainScreen] Disposing camera...');
     _cameraNotifier?.disposeCamera();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    debugPrint('[MainScreen] 🔄 Lifecycle state changed: $state (recording: $_isRecording)');
-
     switch (state) {
       case AppLifecycleState.resumed:
         // App came to foreground
         if (_isRecording) {
           // Already recording - camera is alive, just resume RSSI
-          debugPrint('[MainScreen] ✅ App resumed - recording active, resuming RSSI only');
           ref.read(bleProvider.notifier).resumeRssiPolling();
         } else {
           // Not recording - reinitialize everything
-          debugPrint('[MainScreen] ✅ App resumed - reinitializing camera');
           _initializeCamera();
           ref.read(bleProvider.notifier).resumeRssiPolling();
         }
@@ -101,19 +92,15 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       case AppLifecycleState.inactive:
         // Brief pause (phone call, dialog, switching apps)
         // Don't release resources yet - might come back immediately
-        debugPrint('[MainScreen] ⚠️ App inactive (brief pause)');
         break;
 
       case AppLifecycleState.paused:
         // App went to background
         if (_isRecording) {
           // Recording in progress - keep camera and RSSI alive
-          debugPrint('[MainScreen] 📹 App paused but recording active - keeping resources alive');
-          debugPrint('[MainScreen] ⚠️ Note: System may still interrupt recording (no foreground service)');
           // Do nothing - let camera and RSSI continue
         } else {
           // Not recording - release resources to save battery
-          debugPrint('[MainScreen] ⏸️ App paused - releasing camera');
           _cameraNotifier?.disposeCamera();
           ref.read(bleProvider.notifier).pauseRssiPolling();
         }
@@ -121,12 +108,10 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
 
       case AppLifecycleState.detached:
         // App being destroyed - final cleanup
-        debugPrint('[MainScreen] 🛑 App detached');
         break;
 
       case AppLifecycleState.hidden:
         // Added in Flutter 3.13+ - similar to paused
-        debugPrint('[MainScreen] 🙈 App hidden');
         break;
     }
   }
@@ -352,7 +337,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       });
 
     } catch (e) {
-      debugPrint('[MainScreen] ❌ Error starting recording: $e');
       _showError('Failed to start recording: $e');
     }
   }
@@ -394,7 +378,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       });
 
       // Flush buffer from worker isolate (get all accumulated samples)
-      debugPrint('[MainScreen] Flushing buffer from worker isolate...');
       final samples = await widget.workerIsolate.flushBuffer();
 
       // Save JSON file with real sample data
@@ -449,11 +432,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           ),
         );
       }
-
-      debugPrint('[MainScreen] Video: $videoPath');
-      debugPrint('[MainScreen] JSON: $jsonPath');
     } catch (e) {
-      debugPrint('[MainScreen] ❌ Error stopping recording: $e');
 
       setState(() {
         _isRecording = false;
