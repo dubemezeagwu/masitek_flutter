@@ -111,23 +111,19 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ElevatedButton.icon(
-              onPressed: bleState.connectionState == BleConnectionState.scanning ||
-                      bleState.connectionState == BleConnectionState.connected
-                  ? null // Disable button while scanning or connected
+              onPressed: bleState.connectionState == BleConnectionState.connected
+                  ? null // Disable button when connected
                   : () async {
+                      // Handles double-tap gracefully (stops current scan, starts fresh)
                       await bleNotifier.startScanning();
                     },
-              icon: Icon(
-                bleState.connectionState == BleConnectionState.scanning
-                    ? Icons.bluetooth_searching
-                    : Icons.bluetooth,
+              icon: const Icon(
+                Icons.bluetooth,
                 size: 20,
               ),
-              label: Text(
-                bleState.connectionState == BleConnectionState.scanning
-                    ? 'Scanning...'
-                    : 'Scan',
-                style: const TextStyle(
+              label: const Text(
+                'Scan',
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -156,6 +152,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               deviceName: bleState.connectedDevice!.platformName.isNotEmpty
                   ? bleState.connectedDevice!.platformName
                   : 'Unknown Device',
+              currentRssi: bleState.currentRssi,
               onDisconnect: () async {
                 debugPrint('[ScanScreen] Disconnect button tapped');
                 await bleNotifier.disconnect();

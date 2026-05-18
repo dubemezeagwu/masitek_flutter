@@ -59,6 +59,7 @@ class BleState {
   final String? errorMessage;
   final int? connectionAttempt;
   final List<int>? lastReceivedBytes;  // Last received BLE notification bytes
+  final int currentRssi;  // Current signal strength (dBm), updated every 2 seconds when connected
 
   const BleState({
     this.connectionState = BleConnectionState.disconnected,
@@ -67,6 +68,7 @@ class BleState {
     this.errorMessage,
     this.connectionAttempt,
     this.lastReceivedBytes,
+    this.currentRssi = 0,
   });
 
   BleState copyWith({
@@ -76,6 +78,7 @@ class BleState {
     String? errorMessage,
     int? connectionAttempt,
     List<int>? lastReceivedBytes,
+    int? currentRssi,
   }) {
     return BleState(
       connectionState: connectionState ?? this.connectionState,
@@ -84,6 +87,7 @@ class BleState {
       errorMessage: errorMessage ?? this.errorMessage,
       connectionAttempt: connectionAttempt ?? this.connectionAttempt,
       lastReceivedBytes: lastReceivedBytes ?? this.lastReceivedBytes,
+      currentRssi: currentRssi ?? this.currentRssi,
     );
   }
 }
@@ -94,6 +98,7 @@ class BleNotifier extends StateNotifier<BleState> {
   StreamSubscription<List<int>>? _dataSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
+  Timer? _rssiTimer; // Periodic timer for RSSI polling (every 2 seconds)
 
   Function(List<int>)? _currentDataCallback; // Store for reconnect
 
@@ -112,7 +117,17 @@ class BleNotifier extends StateNotifier<BleState> {
   ///
   /// Returns true if scanning started successfully, false otherwise.
   /// Permission check acts as safety guard (permissions requested upfront at app launch).
+  ///
+  /// If scan is already running, stops it first and starts fresh (handles double-tap).
   Future<bool> startScanning() async {
+    // Guard: If already scanning, stop current scan first (double-tap handling)
+    if (state.connectionState == BleConnectionState.scanning) {
+      debugPrint('[Provider] Scan already running - restarting scan with fresh state');
+      await _stopScanningInternal();
+      // Small delay to ensure clean stop
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
     // Check permissions (safety guard)
     final hasPermissions = await BlePermissionHandler.checkBlePermissions();
     if (!hasPermissions) {
@@ -123,7 +138,7 @@ class BleNotifier extends StateNotifier<BleState> {
       return false;
     }
 
-    // Start scanning
+    // Start scanning (clear devices for fresh start)
     state = state.copyWith(
       connectionState: BleConnectionState.scanning,
       discoveredDevices: [],
@@ -133,7 +148,7 @@ class BleNotifier extends StateNotifier<BleState> {
     try {
       _scanSubscription = BleScanner.scanForDevices().listen(
         (results) {
-          // Update discovered devices in real-time
+          // Update discovered devices in real-time (RSSI updates every ~1 second)
           state = state.copyWith(discoveredDevices: results);
         },
         onError: (error) {
@@ -154,6 +169,14 @@ class BleNotifier extends StateNotifier<BleState> {
       );
       return false;
     }
+  }
+
+  /// Internal method to stop scanning without changing state.
+  ///
+  /// Used for clean restart when double-tapping scan button.
+  Future<void> _stopScanningInternal() async {
+    await _scanSubscription?.cancel();
+    await BleScanner.stopScan();
   }
 
   /// Stops BLE scanning.
@@ -209,8 +232,10 @@ class BleNotifier extends StateNotifier<BleState> {
         onDataReceived: onDataReceived,
       );
 
-      debugPrint('[Provider] ✅ Connection successful, updating state to connected');
       state = state.copyWith(connectionState: BleConnectionState.connected);
+
+      // Start RSSI polling for signal strength monitoring
+      _startRssiPolling();
 
       // Set up connection state listener immediately after successful connection
       _connectionStateSubscription?.cancel();
@@ -266,9 +291,10 @@ class BleNotifier extends StateNotifier<BleState> {
         onDataReceived: _currentDataCallback!,
       );
 
-      debugPrint('[Provider] ✅ Reconnection successful! Data subscription restored.');
-      debugPrint('[Provider] ✅ Updating state to connected');
       state = state.copyWith(connectionState: BleConnectionState.connected);
+
+      // Restart RSSI polling after successful reconnection
+      _startRssiPolling();
     } catch (e) {
       debugPrint('[Provider] ❌ Reconnection failed after all attempts: $e');
       state = state.copyWith(
@@ -283,6 +309,9 @@ class BleNotifier extends StateNotifier<BleState> {
     if (state.connectedDevice != null) {
       debugPrint('[Provider] Intentional disconnect requested');
 
+      // Stop RSSI polling
+      _stopRssiPolling();
+
       // Set state to disconnected FIRST to prevent reconnection logic from triggering
       state = state.copyWith(
         connectionState: BleConnectionState.disconnected,
@@ -293,7 +322,6 @@ class BleNotifier extends StateNotifier<BleState> {
       await BleConnectionManager.disconnectDevice(state.connectedDevice!);
 
       state = state.copyWith(connectedDevice: null);
-      debugPrint('[Provider] ✅ Disconnect complete, device list cleared');
     }
   }
 
@@ -304,8 +332,58 @@ class BleNotifier extends StateNotifier<BleState> {
     state = state.copyWith(lastReceivedBytes: bytes);
   }
 
+  /// Starts periodic RSSI polling (every 2 seconds).
+  ///
+  /// Called automatically after successful connection.
+  void _startRssiPolling() {
+    _rssiTimer?.cancel(); // Cancel any existing timer
+    _rssiTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      final device = state.connectedDevice;
+
+      if (device != null && state.connectionState == BleConnectionState.connected) {
+        try {
+          final rssi = await device.readRssi();
+          state = state.copyWith(currentRssi: rssi);
+        } catch (e) {
+          debugPrint('[Provider] ⚠️ Failed to read RSSI: $e');
+        }
+      }
+    });
+  }
+
+  /// Stops RSSI polling.
+  ///
+  /// Called automatically on disconnect.
+  void _stopRssiPolling() {
+    _rssiTimer?.cancel();
+    _rssiTimer = null;
+    state = state.copyWith(currentRssi: 0); // Reset RSSI
+  }
+
+  /// Pauses RSSI polling when app goes to background.
+  ///
+  /// Called from lifecycle observer (saves battery).
+  void pauseRssiPolling() {
+    debugPrint('[Provider] ⏸️ Pausing RSSI polling (app backgrounded)');
+    _rssiTimer?.cancel();
+    _rssiTimer = null;
+    // Keep currentRssi value (don't reset to 0)
+  }
+
+  /// Resumes RSSI polling when app comes to foreground.
+  ///
+  /// Called from lifecycle observer.
+  void resumeRssiPolling() {
+    // Only resume if we're connected
+    if (state.connectionState == BleConnectionState.connected) {
+      debugPrint('[Provider] ▶️ Resuming RSSI polling (app foregrounded)');
+      _startRssiPolling();
+    }
+  }
+
   @override
   void dispose() {
+    _stopRssiPolling();
     _scanSubscription?.cancel();
     _dataSubscription?.cancel();
     _isScanningSubscription?.cancel();
