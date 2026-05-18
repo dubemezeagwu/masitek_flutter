@@ -67,7 +67,6 @@ class PersistenceService {
       final file = File(filePath);
       await file.writeAsString(jsonString);
 
-      debugPrint('[PersistenceService] ✅ Session data saved: $filePath');
       debugPrint('[PersistenceService] File size: ${(await file.length() / 1024).toStringAsFixed(2)} KB');
 
       return filePath;
@@ -101,7 +100,6 @@ class PersistenceService {
         return null;
       }
 
-      debugPrint('[PersistenceService] ✅ Large dataset saved successfully');
       return result;
     } catch (e) {
       debugPrint('[PersistenceService] ❌ Failed to save large dataset: $e');
@@ -256,7 +254,6 @@ class PersistenceService {
         }
       }
 
-      debugPrint('[PersistenceService] ✅ Cleanup complete: $deletedCount files deleted');
       return deletedCount;
     } catch (e) {
       debugPrint('[PersistenceService] ⚠️ Error during cleanup: $e');

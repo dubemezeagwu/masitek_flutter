@@ -69,7 +69,6 @@ class CameraService {
       await _controller!.initialize();
       _isInitialized = true;
 
-      debugPrint('[CameraService] ✅ Camera initialized successfully');
       return true;
     } catch (e) {
       debugPrint('[CameraService] ❌ Camera initialization failed: $e');
@@ -97,7 +96,6 @@ class CameraService {
       debugPrint('[CameraService] Starting video recording...');
       await _controller!.startVideoRecording();
       _isRecording = true;
-      debugPrint('[CameraService] ✅ Recording started');
       return true;
     } catch (e) {
       debugPrint('[CameraService] ❌ Failed to start recording: $e');
@@ -124,7 +122,6 @@ class CameraService {
       // Move file to Downloads directory with timestamped name
       final movedFilePath = await _moveToDownloads(videoFile.path);
 
-      debugPrint('[CameraService] ✅ Recording stopped, file saved: $movedFilePath');
       return movedFilePath;
     } catch (e) {
       debugPrint('[CameraService] ❌ Failed to stop recording: $e');
@@ -176,7 +173,6 @@ class CameraService {
       // Delete temp file
       await tempFile.delete();
 
-      debugPrint('[CameraService] ✅ Video saved to: $finalPath');
       return finalFile.path;
     } catch (e) {
       debugPrint('[CameraService] ⚠️ Failed to move file: $e, keeping temp file');
@@ -195,7 +191,6 @@ class CameraService {
       await _controller?.dispose();
       _controller = null;
       _isInitialized = false;
-      debugPrint('[CameraService] ✅ Camera disposed');
     } catch (e) {
       debugPrint('[CameraService] ⚠️ Error disposing camera: $e');
     }

@@ -63,7 +63,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
         controller: _cameraService.controller,
         errorMessage: null,
       );
-      debugPrint('[CameraProvider] ✅ Camera initialized successfully');
     } else {
       state = state.copyWith(
         isInitialized: false,
@@ -98,7 +97,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
         isRecording: true,
         errorMessage: null,
       );
-      debugPrint('[CameraProvider] ✅ Recording started');
     } else {
       state = state.copyWith(
         errorMessage: 'Failed to start recording',
@@ -127,7 +125,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
     );
 
     if (filePath != null) {
-      debugPrint('[CameraProvider] ✅ Recording stopped, file saved: $filePath');
     } else {
       debugPrint('[CameraProvider] ❌ Failed to stop recording');
     }
@@ -146,7 +143,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
       controller: null,
     );
 
-    debugPrint('[CameraProvider] ✅ Camera disposed');
   }
 
   @override
