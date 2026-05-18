@@ -2,14 +2,17 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/ble_connection_state.dart';
+import '../../core/extensions/rssi_extensions.dart';
 import '../../services/persistence_service.dart';
 import '../../data/isolate/worker_isolate.dart';
 import '../providers/ble_provider.dart';
 import '../providers/camera_provider.dart';
+import '../providers/performance_provider.dart';
 import '../widgets/connection_status_bar.dart';
 import '../widgets/data_preview_row.dart';
 import '../widgets/live_chart.dart';
 import '../widgets/date_time_widget.dart';
+import '../widgets/performance_overlay.dart' as perf;
 
 class MainScreen extends ConsumerStatefulWidget {
   final WorkerIsolate workerIsolate;
@@ -23,9 +26,110 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
   bool _isRecording = false;
   DateTime? _recordingStartTime;
+  CameraNotifier? _cameraNotifier; // Capture notifier reference
+
+  @override
+  void initState() {
+    super.initState();
+    // Capture camera notifier reference early (before dispose might be called)
+    _cameraNotifier = ref.read(cameraProvider.notifier);
+
+    // Add lifecycle observer to handle app background/foreground
+    WidgetsBinding.instance.addObserver(this);
+
+    // Initialize camera when MainScreen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeCamera();
+    });
+  }
+
+  /// Initialize camera for recording
+  Future<void> _initializeCamera() async {
+    debugPrint('[MainScreen] Initializing camera...');
+    final cameraInitialized = await _cameraNotifier!.initialize();
+
+    if (!cameraInitialized) {
+      debugPrint('[MainScreen] ⚠️ Camera initialization failed (permission denied or unavailable)');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Camera unavailable - recording disabled'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      debugPrint('[MainScreen] ✅ Camera initialized successfully');
+    }
+  }
+
+  @override
+  void dispose() {
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+
+    // Dispose camera to release resources when leaving screen
+    // Use captured notifier reference (safe to call during dispose)
+    debugPrint('[MainScreen] Disposing camera...');
+    _cameraNotifier?.disposeCamera();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('[MainScreen] 🔄 Lifecycle state changed: $state (recording: $_isRecording)');
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App came to foreground
+        if (_isRecording) {
+          // Already recording - camera is alive, just resume RSSI
+          debugPrint('[MainScreen] ✅ App resumed - recording active, resuming RSSI only');
+          ref.read(bleProvider.notifier).resumeRssiPolling();
+        } else {
+          // Not recording - reinitialize everything
+          debugPrint('[MainScreen] ✅ App resumed - reinitializing camera');
+          _initializeCamera();
+          ref.read(bleProvider.notifier).resumeRssiPolling();
+        }
+        break;
+
+      case AppLifecycleState.inactive:
+        // Brief pause (phone call, dialog, switching apps)
+        // Don't release resources yet - might come back immediately
+        debugPrint('[MainScreen] ⚠️ App inactive (brief pause)');
+        break;
+
+      case AppLifecycleState.paused:
+        // App went to background
+        if (_isRecording) {
+          // Recording in progress - keep camera and RSSI alive
+          debugPrint('[MainScreen] 📹 App paused but recording active - keeping resources alive');
+          debugPrint('[MainScreen] ⚠️ Note: System may still interrupt recording (no foreground service)');
+          // Do nothing - let camera and RSSI continue
+        } else {
+          // Not recording - release resources to save battery
+          debugPrint('[MainScreen] ⏸️ App paused - releasing camera');
+          _cameraNotifier?.disposeCamera();
+          ref.read(bleProvider.notifier).pauseRssiPolling();
+        }
+        break;
+
+      case AppLifecycleState.detached:
+        // App being destroyed - final cleanup
+        debugPrint('[MainScreen] 🛑 App detached');
+        break;
+
+      case AppLifecycleState.hidden:
+        // Added in Flutter 3.13+ - similar to paused
+        debugPrint('[MainScreen] 🙈 App hidden');
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,13 +187,23 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ),
         centerTitle: false,
         elevation: 0,
+        actions: [
+          // Performance metrics toggle button
+          IconButton(
+            icon: const Icon(Icons.speed),
+            tooltip: 'Toggle Performance Metrics',
+            onPressed: () {
+              ref.read(performanceProvider.notifier).toggleOverlay();
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
           // Main content
           Column(
             children: [
-              // Top row: Date/time and connection status
+              // Top row: Date/time, signal indicator, and connection status
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
@@ -99,7 +213,17 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       child: DateTimeWidget(),
                     ),
 
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+
+                    // Signal strength indicator (middle)
+                    if (bleState.connectionState == BleConnectionState.connected && bleState.currentRssi != 0)
+                      Icon(
+                        bleState.currentRssi.signalIcon,
+                        color: bleState.currentRssi.signalColor,
+                        size: 20,
+                      ),
+
+                    const SizedBox(width: 8),
 
                     // Connection status (right side)
                     ConnectionStatusBar(
@@ -135,6 +259,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               left: 20,
               child: _buildCameraPreview(),
             ),
+
+          // Performance metrics overlay
+          const perf.PerformanceOverlay(),
         ],
       ),
       // FAB for starting/stopping recording (icon only)
@@ -224,7 +351,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         _recordingStartTime = DateTime.now();
       });
 
-      debugPrint('[MainScreen] ✅ Recording started');
     } catch (e) {
       debugPrint('[MainScreen] ❌ Error starting recording: $e');
       _showError('Failed to start recording: $e');
@@ -270,7 +396,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       // Flush buffer from worker isolate (get all accumulated samples)
       debugPrint('[MainScreen] Flushing buffer from worker isolate...');
       final samples = await widget.workerIsolate.flushBuffer();
-      debugPrint('[MainScreen] ✅ Retrieved ${samples.length} samples from buffer');
 
       // Save JSON file with real sample data
       final jsonPath = await PersistenceService.saveSessionData(
@@ -325,7 +450,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         );
       }
 
-      debugPrint('[MainScreen] ✅ Recording saved');
       debugPrint('[MainScreen] Video: $videoPath');
       debugPrint('[MainScreen] JSON: $jsonPath');
     } catch (e) {
