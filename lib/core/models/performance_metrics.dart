@@ -1,10 +1,5 @@
-/// Performance metrics data model.
-///
-/// Tracks key performance indicators for the app:
-/// - FPS (frames per second)
-/// - Memory usage (MB)
-/// - BLE notification rate (notifications/sec)
-/// - Chart render rate (renders/sec)
+// performance metrics for seeing processing data
+
 class PerformanceMetrics {
   final double fps;
   final double memoryUsageMB;
@@ -36,7 +31,6 @@ class PerformanceMetrics {
     );
   }
 
-  /// Create initial metrics with zero values
   factory PerformanceMetrics.initial() {
     return PerformanceMetrics(
       fps: 0.0,

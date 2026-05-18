@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import '../core/constants/ble_constants.dart';
 
 /// BLE scanner service with retry logic and configurable scan parameters.
 ///
@@ -9,9 +10,9 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 /// - Delay between attempts: 2 seconds
 /// - Returns list of discovered devices
 class BleScanner {
-  static const int _maxScanAttempts = 5;
-  static const Duration _scanDuration = Duration(seconds: 90);
-  static const Duration _retryDelay = Duration(seconds: 2);
+  static const int _maxScanAttempts = BLEConstants.maxScanAttempts;
+  static const Duration _scanDuration = Duration(seconds: BLEConstants.scanDurationSeconds);
+  static const Duration _retryDelay = Duration(seconds: BLEConstants.scanRetryDelaySeconds);
 
   /// Scans for BLE devices with automatic retry logic.
   ///

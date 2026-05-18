@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../../core/models/ble_connection_state.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/extensions/rssi_extensions.dart';
 
 /// Reusable widget for displaying a discovered BLE device in a list.
@@ -29,7 +28,6 @@ class DeviceListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final technicalTheme = theme.extension<TechnicalTextTheme>()!;
     final device = result.device;
     final deviceName = device.platformName.isNotEmpty
         ? device.platformName
@@ -84,7 +82,8 @@ class DeviceListItem extends StatelessWidget {
               children: [
                 Text(
                   device.remoteId.toString(),
-                  style: technicalTheme.deviceId.copyWith(
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
                     color: Colors.grey.shade600,
                     fontSize: 11,
                   ),

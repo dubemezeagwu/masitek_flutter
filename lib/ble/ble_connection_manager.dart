@@ -19,13 +19,9 @@ class BleConnectionManager {
   static final Guid _nusTxCharUuid = Guid(BLEConstants.nusTxCharUuid);
 
   static const int _maxConnectionAttempts = BLEConstants.maxConnectionAttempts;
-  static const List<Duration> _retryBackoff = [
-    Duration(seconds: 1),
-    Duration(seconds: 2),
-    Duration(seconds: 4),
-    Duration(seconds: 8),
-    Duration(seconds: 16),
-  ];
+  static final List<Duration> _retryBackoff = BLEConstants.reconnectBackoffSeconds
+      .map((seconds) => Duration(seconds: seconds))
+      .toList();
 
   /// Connects to a BLE device and subscribes to NUS TX characteristic.
   ///
