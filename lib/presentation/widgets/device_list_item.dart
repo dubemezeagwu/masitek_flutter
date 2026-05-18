@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../../core/models/ble_connection_state.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/extensions/rssi_extensions.dart';
 
 /// Reusable widget for displaying a discovered BLE device in a list.
 ///
@@ -9,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 /// Takes a ScanResult from flutter_blue_plus and displays:
 /// - Device name (or "Unknown Device" if empty)
 /// - Device MAC address
+/// - Signal strength indicator (RSSI-based)
 /// - "Connect" button with loading state
 class DeviceListItem extends StatelessWidget {
   final ScanResult result;
@@ -37,6 +39,9 @@ class DeviceListItem extends StatelessWidget {
     final isConnecting = connectionState == BleConnectionState.connecting &&
         connectingDeviceId == device.remoteId.toString();
 
+    // Get signal strength metrics using RSSI extension
+    final rssi = result.rssi;
+
     return Container(
       color: Colors.white,
       child: Column(
@@ -46,6 +51,26 @@ class DeviceListItem extends StatelessWidget {
             dense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             onTap: isConnecting ? null : onConnect,
+            // Signal strength indicator (left side)
+            leading: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  rssi.signalIcon,
+                  color: rssi.signalColor,
+                  size: 24,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$rssi dBm',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
             title: Text(
               deviceName,
               style: theme.textTheme.titleSmall?.copyWith(
@@ -54,12 +79,26 @@ class DeviceListItem extends StatelessWidget {
                 fontSize: 14,
               ),
             ),
-            subtitle: Text(
-              device.remoteId.toString(),
-              style: technicalTheme.deviceId.copyWith(
-                color: Colors.grey.shade600,
-                fontSize: 11,
-              ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  device.remoteId.toString(),
+                  style: technicalTheme.deviceId.copyWith(
+                    color: Colors.grey.shade600,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  rssi.proximityLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: rssi.signalColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
             trailing: isConnecting
                 ? Row(

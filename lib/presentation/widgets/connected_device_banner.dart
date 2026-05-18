@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import '../../core/extensions/rssi_extensions.dart';
 
 /// Banner widget displaying current BLE connection status.
 ///
-/// Shows connected device name with options to disconnect or return to session.
+/// Shows connected device name with signal strength indicator, plus options to disconnect or return to session.
 /// Displayed at top of scan screen when a device is connected.
 class ConnectedDeviceBanner extends StatelessWidget {
   final String deviceName;
+  final int currentRssi;
   final VoidCallback onDisconnect;
   final VoidCallback onReturnToSession;
 
   const ConnectedDeviceBanner({
     super.key,
     required this.deviceName,
+    required this.currentRssi,
     required this.onDisconnect,
     required this.onReturnToSession,
   });
@@ -58,7 +61,7 @@ class ConnectedDeviceBanner extends StatelessWidget {
 
           const SizedBox(height: 12),
 
-          // Device name
+          // Device name with signal indicator
           Row(
             children: [
               const Text(
@@ -81,6 +84,14 @@ class ConnectedDeviceBanner extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
+              // Signal strength indicator
+              if (currentRssi != 0)
+                Icon(
+                  currentRssi.signalIcon,
+                  color: currentRssi.signalColor,
+                  size: 20,
+                ),
             ],
           ),
 
