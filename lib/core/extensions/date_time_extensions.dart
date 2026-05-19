@@ -1,5 +1,4 @@
 extension DateTimeExtensions on DateTime {
-
   String get timeOfDay {
     if (hour >= 0 && hour < 12) {
       return "Morning";
@@ -11,4 +10,13 @@ extension DateTimeExtensions on DateTime {
   }
 
   String get greeting => "Good $timeOfDay";
+
+  String toMasitekFilename() {
+    return 'masitek_'
+        '${day.toString().padLeft(2, '0')}_'
+        '${month.toString().padLeft(2, '0')}_'
+        '${year}_'
+        '${hour.toString().padLeft(2, '0')}_'
+        '${minute.toString().padLeft(2, '0')}';
+  }
 }
