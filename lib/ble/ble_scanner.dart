@@ -1,44 +1,31 @@
 import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../core/constants/ble_constants.dart';
+import 'ble_scanner_interface.dart';
 
-/// BLE scanner service with retry logic and configurable scan parameters.
-///
-/// Scanning Strategy:
-/// - Max attempts: 5
-/// - Scan duration: 90 seconds (allows live RSSI updates)
-/// - Delay between attempts: 2 seconds
-/// - Returns list of discovered devices
-class BleScanner {
-  static const int _maxScanAttempts = BLEConstants.maxScanAttempts;
-  static const Duration _scanDuration = Duration(seconds: BLEConstants.scanDurationSeconds);
-  static const Duration _retryDelay = Duration(seconds: BLEConstants.scanRetryDelaySeconds);
+class BleScanner implements BleScannerInterface {
+  final int _maxScanAttempts = BLEConstants.maxScanAttempts;
+  final Duration _scanDuration = const Duration(seconds: BLEConstants.scanDurationSeconds);
+  final Duration _retryDelay = const Duration(seconds: BLEConstants.scanRetryDelaySeconds);
 
-  /// Scans for BLE devices with automatic retry logic.
-  ///
-  /// Returns a stream of scan results that can be listened to in real-time.
-  /// Scans for 90 seconds to provide live RSSI updates, then silently stops.
-  ///
-  /// Throws [BleScanException] if scanning fails after max attempts.
-  static Stream<List<ScanResult>> scanForDevices() async* {
+  @override
+  Stream<List<ScanResult>> scanForDevices() async* {
     int attemptCount = 0;
 
     while (attemptCount < _maxScanAttempts) {
       attemptCount++;
 
       try {
-        // Start scanning (90-second timeout for live RSSI updates)
         await FlutterBluePlus.startScan(
           timeout: _scanDuration,
           androidUsesFineLocation: true,
         );
 
-        // Listen to scan results (RSSI updates in real-time for 90 seconds)
+        // listen to scan results (RSSI updates in real-time for 90 seconds)
         await for (final results in FlutterBluePlus.scanResults) {
           yield results;
         }
 
-        // Scan completed successfully
         break;
       } catch (e) {
         // Scan failed, retry after delay
@@ -54,8 +41,8 @@ class BleScanner {
     }
   }
 
-  /// Stops an ongoing BLE scan.
-  static Future<void> stopScan() async {
+  @override
+  Future<void> stopScan() async {
     try {
       await FlutterBluePlus.stopScan();
     } catch (e) {
@@ -63,15 +50,6 @@ class BleScanner {
     }
   }
 
-  /// Checks if BLE scanning is currently active.
-  static Stream<bool> get isScanning => FlutterBluePlus.isScanning;
-}
-
-/// Exception thrown when BLE scanning fails after max retry attempts.
-class BleScanException implements Exception {
-  final String message;
-  BleScanException(this.message);
-
   @override
-  String toString() => 'BleScanException: $message';
+  Stream<bool> get isScanning => FlutterBluePlus.isScanning;
 }

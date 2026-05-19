@@ -5,12 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/ble_connection_state.dart';
 import '../../ble/ble_permission_handler.dart';
 import '../../ble/ble_scanner.dart';
+import '../../ble/ble_scanner_interface.dart';
 import '../../ble/ble_connection_manager.dart';
+import '../../ble/ble_connection_interface.dart';
 
-/// Converts technical error messages to user-friendly messages.
-///
-/// Technical errors are still printed to debug console for debugging.
-/// Only common errors are mapped - others are simplified but kept technical.
 String _getUserFriendlyError(String technicalError) {
   // Log technical error for debugging
   debugPrint('[Error] Technical: $technicalError');
@@ -40,18 +38,20 @@ String _getUserFriendlyError(String technicalError) {
   }
 }
 
-/// BLE state provider managing scanning, connection, and device discovery.
-///
-/// Provides:
-/// - Current connection state
-/// - List of discovered devices
-/// - Methods for scanning and connecting
-/// - Permission handling
-final bleProvider = StateNotifierProvider<BleNotifier, BleState>((ref) {
-  return BleNotifier();
+final bleScannerProvider = Provider<BleScannerInterface>((ref) {
+  return BleScanner();
 });
 
-/// BLE state data class.
+final bleConnectionProvider = Provider<BleConnectionInterface>((ref) {
+  return BleConnectionManager();
+});
+
+final bleProvider = StateNotifierProvider<BleNotifier, BleState>((ref) {
+  final scanner = ref.watch(bleScannerProvider);
+  final connectionManager = ref.watch(bleConnectionProvider);
+  return BleNotifier(scanner, connectionManager);
+});
+
 class BleState {
   final BleConnectionState connectionState;
   final List<ScanResult> discoveredDevices;
@@ -92,17 +92,18 @@ class BleState {
   }
 }
 
-/// BLE state notifier managing all BLE operations.
 class BleNotifier extends StateNotifier<BleState> {
+  final BleScannerInterface _scanner;
+  final BleConnectionInterface _connectionManager;
+
   StreamSubscription<List<ScanResult>>? _scanSubscription;
   StreamSubscription<List<int>>? _dataSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
   StreamSubscription<BluetoothConnectionState>? _connectionStateSubscription;
   Timer? _rssiTimer; // Periodic timer for RSSI polling (every 2 seconds)
-
   Function(List<int>)? _currentDataCallback; // Store for reconnect
 
-  BleNotifier() : super(const BleState()) {
+  BleNotifier(this._scanner, this._connectionManager) : super(const BleState()) {
     // Listen to FlutterBluePlus scanning state to keep UI in sync
     _isScanningSubscription = FlutterBluePlus.isScanning.listen((isScanning) {
       // If scan stopped but our state still shows scanning, reset it
@@ -144,7 +145,7 @@ class BleNotifier extends StateNotifier<BleState> {
     );
 
     try {
-      _scanSubscription = BleScanner.scanForDevices().listen(
+      _scanSubscription = _scanner.scanForDevices().listen(
         (results) {
           // Update discovered devices in real-time (RSSI updates every ~1 second)
           state = state.copyWith(discoveredDevices: results);
@@ -174,7 +175,7 @@ class BleNotifier extends StateNotifier<BleState> {
   /// Used for clean restart when double-tapping scan button.
   Future<void> _stopScanningInternal() async {
     await _scanSubscription?.cancel();
-    await BleScanner.stopScan();
+    await _scanner.stopScan();
   }
 
   /// Stops BLE scanning.
@@ -183,7 +184,7 @@ class BleNotifier extends StateNotifier<BleState> {
   /// Only transitions to disconnected if we're in scanning state.
   Future<void> stopScanning() async {
     await _scanSubscription?.cancel();
-    await BleScanner.stopScan();
+    await _scanner.stopScan();
 
     // Only set to disconnected if we're currently scanning
     // Don't overwrite connected/connecting states
@@ -218,7 +219,7 @@ class BleNotifier extends StateNotifier<BleState> {
       // Store callback for reconnect
       _currentDataCallback = onDataReceived;
 
-      _dataSubscription = await BleConnectionManager.connectToDevice(
+      _dataSubscription = await _connectionManager.connectToDevice(
         device,
         onDataReceived: onDataReceived,
       );
@@ -264,7 +265,7 @@ class BleNotifier extends StateNotifier<BleState> {
     state = state.copyWith(connectionState: BleConnectionState.reconnecting);
 
     try {
-      _dataSubscription = await BleConnectionManager.reconnectToDevice(
+      _dataSubscription = await _connectionManager.reconnectToDevice(
         device,
         onDataReceived: _currentDataCallback!,
       );
@@ -296,7 +297,7 @@ class BleNotifier extends StateNotifier<BleState> {
       );
 
       await _dataSubscription?.cancel();
-      await BleConnectionManager.disconnectDevice(state.connectedDevice!);
+      await _connectionManager.disconnectDevice(state.connectedDevice!);
 
       state = state.copyWith(connectedDevice: null);
     }

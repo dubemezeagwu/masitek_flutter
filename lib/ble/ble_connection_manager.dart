@@ -3,31 +3,27 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../core/constants/ble_constants.dart';
+import 'ble_connection_interface.dart';
 
-/// Manages BLE connection lifecycle with proper sequencing and error handling.
-///
-/// Connection Flow (per CLAUDE.md):
-/// 1. Stop scan before connecting (prevents connection failures on some Android devices)
-/// 2. Connect with retry logic (exponential backoff: 1s, 2s, 4s, 8s, 16s)
-/// 3. Discover services
-/// 4. Find NUS service + TX characteristic
-/// 5. Subscribe to notifications with auto-cleanup
-/// 6. Navigate to main screen ONLY after successful subscription
-class BleConnectionManager {
-  // NUS (Nordic UART Service) UUIDs - using constants from BLEConstants
-  static final Guid _nusServiceUuid = Guid(BLEConstants.nusServiceUuid);
-  static final Guid _nusTxCharUuid = Guid(BLEConstants.nusTxCharUuid);
+// Connection Flow:
+// 1. Stop scan before connecting
+// 2. Connect with retry (exponential backoff: 1s, 2s, 4s, 8s, 16s)
+// 3. Discover services
+// 4. Find NUS service + TX characteristic
+// 5. Subscribe to notifications with auto-cleanup
+// 6. Navigate only after successful subscription
 
-  static const int _maxConnectionAttempts = BLEConstants.maxConnectionAttempts;
-  static final List<Duration> _retryBackoff = BLEConstants.reconnectBackoffSeconds
+class BleConnectionManager implements BleConnectionInterface {
+  final Guid _nusServiceUuid = Guid(BLEConstants.nusServiceUuid);
+  final Guid _nusTxCharUuid = Guid(BLEConstants.nusTxCharUuid);
+  final int _maxConnectionAttempts = BLEConstants.maxConnectionAttempts;
+  final List<Duration> _retryBackoff = BLEConstants.reconnectBackoffSeconds
       .map((seconds) => Duration(seconds: seconds))
       .toList();
 
-  /// Connects to a BLE device and subscribes to NUS TX characteristic.
-  ///
-  /// Returns the TX characteristic subscription stream on success.
-  /// Throws [BleConnectionException] if connection or subscription fails.
-  static Future<StreamSubscription<List<int>>> connectToDevice(
+
+  @override
+  Future<StreamSubscription<List<int>>> connectToDevice(
     BluetoothDevice device, {
     required Function(List<int> bytes) onDataReceived,
   }) async {
@@ -38,16 +34,13 @@ class BleConnectionManager {
       attemptCount++;
 
       try {
-        // Stop scanning before connecting (CRITICAL)
+        // stop scanning before connecting (CRITICAL)
         await FlutterBluePlus.stopScan();
 
-        // Connect to device
         await device.connect(autoConnect: false);
 
-        // Discover services (MUST be called after every connect/reconnect)
         final services = await device.discoverServices();
 
-        // Find NUS service
         final nusService = services.firstWhere(
           (s) => s.uuid == _nusServiceUuid,
           orElse: () => throw BleConnectionException(
@@ -55,7 +48,6 @@ class BleConnectionManager {
           ),
         );
 
-        // Find TX characteristic
         final txCharacteristic = nusService.characteristics.firstWhere(
           (c) => c.uuid == _nusTxCharUuid,
           orElse: () => throw BleConnectionException(
@@ -63,11 +55,12 @@ class BleConnectionManager {
           ),
         );
 
-        // Subscribe to notifications with auto-cleanup
+        // this creates a stream listener that fires onDataReceived() callback
+        // every time the BLE device sends a notification 
+        // and automatically cleans up when a device disconnects. subscription is auto cancelled
         final subscription = txCharacteristic.onValueReceived.listen(onDataReceived);
         device.cancelWhenDisconnected(subscription, delayed: true);
 
-        // Enable notifications
         try {
           await txCharacteristic.setNotifyValue(true);
         } on PlatformException catch (e) {
@@ -97,10 +90,9 @@ class BleConnectionManager {
     throw BleConnectionException('Unexpected connection failure');
   }
 
-  /// Reconnects to a device after mid-session disconnect.
-  ///
-  /// MUST call discoverServices() again after reconnect (handles are invalidated).
-  static Future<StreamSubscription<List<int>>> reconnectToDevice(
+
+  @override
+  Future<StreamSubscription<List<int>>> reconnectToDevice(
     BluetoothDevice device, {
     required Function(List<int> bytes) onDataReceived,
   }) async {
@@ -110,29 +102,24 @@ class BleConnectionManager {
       attemptCount++;
 
       try {
-        // Reconnect with autoConnect: true (returns immediately for known devices, no timeout)
         await device.connect(autoConnect: true);
 
-        // CRITICAL: Re-discover services after every reconnect
+        // CRITICAL:rRe-discover services after every reconnect
         final services = await device.discoverServices();
 
-        // Find NUS service
         final nusService = services.firstWhere(
           (s) => s.uuid == _nusServiceUuid,
           orElse: () => throw BleConnectionException('NUS service not found'),
         );
 
-        // Find TX characteristic
         final txCharacteristic = nusService.characteristics.firstWhere(
           (c) => c.uuid == _nusTxCharUuid,
           orElse: () => throw BleConnectionException('TX characteristic not found'),
         );
 
-        // Re-subscribe (old subscription auto-cancelled on disconnect)
         final subscription = txCharacteristic.onValueReceived.listen(onDataReceived);
         device.cancelWhenDisconnected(subscription, delayed: true);
 
-        // Re-enable notifications
         await txCharacteristic.setNotifyValue(true);
 
         return subscription;
@@ -150,21 +137,12 @@ class BleConnectionManager {
     throw BleConnectionException('Unexpected reconnection failure');
   }
 
-  /// Disconnects from a BLE device.
-  static Future<void> disconnectDevice(BluetoothDevice device) async {
+  @override
+  Future<void> disconnectDevice(BluetoothDevice device) async {
     try {
       await device.disconnect();
     } catch (e) {
       // Ignore errors when disconnecting (already disconnected)
     }
   }
-}
-
-/// Exception thrown when BLE connection or subscription fails.
-class BleConnectionException implements Exception {
-  final String message;
-  BleConnectionException(this.message);
-
-  @override
-  String toString() => 'BleConnectionException: $message';
 }
