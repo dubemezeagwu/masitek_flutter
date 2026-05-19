@@ -1,16 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/performance_provider.dart';
+import '../../core/extensions/color_extensions.dart';
 
-/// Performance overlay widget displaying real-time metrics.
-///
-/// Shows:
-/// - FPS (frames per second)
-/// - Memory usage (MB)
-/// - BLE notification rate (notifications/sec)
-/// - Chart render rate (renders/sec)
-///
-/// Positioned in top-right corner with semi-transparent background.
 class PerformanceOverlay extends ConsumerWidget {
   const PerformanceOverlay({super.key});
 
@@ -30,7 +22,7 @@ class PerformanceOverlay extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.black.withAlpha(178), // 0.7 * 255 = 178
+          color: Colors.black.withAlpha(178),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.white24),
         ),
@@ -60,7 +52,7 @@ class PerformanceOverlay extends ConsumerWidget {
             _MetricRow(
               label: 'FPS',
               value: metrics.fps.toStringAsFixed(1),
-              color: _getFpsColor(metrics.fps),
+              color: metrics.fps.fpsColor,
             ),
 
             // Memory (placeholder - shows 0.0 for now)
@@ -88,16 +80,8 @@ class PerformanceOverlay extends ConsumerWidget {
       ),
     );
   }
-
-  /// Get color based on FPS value (green = good, yellow = ok, red = bad).
-  Color _getFpsColor(double fps) {
-    if (fps >= 55) return Colors.green;
-    if (fps >= 30) return Colors.yellow;
-    return Colors.red;
-  }
 }
 
-/// Individual metric row widget.
 class _MetricRow extends StatelessWidget {
   final String label;
   final String value;

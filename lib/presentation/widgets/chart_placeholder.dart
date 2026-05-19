@@ -10,9 +10,7 @@ class ChartPlaceholder extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        // Simple white background for data clarity
         color: Colors.white,
-        // Simple thin black border - no fancy styling for data viz
         border: Border.all(
           color: Colors.black,
           width: 1,

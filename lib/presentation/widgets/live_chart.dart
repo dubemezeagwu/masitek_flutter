@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/chart_provider.dart';
 
-/// Live chart displaying raw sensor values in real-time.
-///
-/// Updates automatically as new data arrives via BLE.
-/// Keeps last 1000 points in buffer for pan navigation.
+// Live chart displaying raw sensor values in real-time.
+// Updates automatically as new data arrives via BLE.
+// Keeps last 1000 points in buffer for pan navigation.
+
 class LiveChart extends ConsumerStatefulWidget {
   const LiveChart({super.key});
 
@@ -15,7 +15,6 @@ class LiveChart extends ConsumerStatefulWidget {
 }
 
 class _LiveChartState extends ConsumerState<LiveChart> {
-  // Default visible window size (can pan to see more)
   static const int _defaultVisiblePoints = 250;
 
   // Pan offset (how many points to shift the window left from the end)
@@ -68,7 +67,6 @@ class _LiveChartState extends ConsumerState<LiveChart> {
     final minX = chartState.dataPoints[windowStartIndex].sampleIndex.toDouble();
     final maxX = chartState.dataPoints[windowEndIndex].sampleIndex.toDouble();
 
-    // Build chart with data
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
@@ -84,7 +82,6 @@ class _LiveChartState extends ConsumerState<LiveChart> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Raw values legend
                 Container(
                   width: 12,
                   height: 12,
@@ -103,7 +100,6 @@ class _LiveChartState extends ConsumerState<LiveChart> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Processed values legend (now active!)
                 Container(
                   width: 12,
                   height: 12,
@@ -125,7 +121,6 @@ class _LiveChartState extends ConsumerState<LiveChart> {
             ),
           ),
 
-          // Chart with pan gesture
           Expanded(
             child: GestureDetector(
               // Only intercept horizontal drags for panning
@@ -187,7 +182,6 @@ class _LiveChartState extends ConsumerState<LiveChart> {
                       ),
                     ],
 
-                    // Grid styling
                     gridData: FlGridData(
                       show: true,
                       drawVerticalLine: true,
@@ -208,14 +202,13 @@ class _LiveChartState extends ConsumerState<LiveChart> {
                       },
                     ),
 
-                    // Border styling
                     borderData: FlBorderData(
                       show: true,
                       border: Border.all(color: Colors.grey.shade400, width: 1),
                     ),
 
-                    // Axis numbers only (no titles)
                     titlesData: FlTitlesData(
+
                       // Bottom axis (X - sample index)
                       bottomTitles: AxisTitles(
                         sideTitles: SideTitles(
@@ -274,6 +267,7 @@ class _LiveChartState extends ConsumerState<LiveChart> {
                               strokeWidth: 1.5,
                               dashArray: [5, 5], // Dashed line
                             ),
+                            
                             // Dot at the touched point
                             FlDotData(
                               show: true,

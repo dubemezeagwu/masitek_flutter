@@ -229,10 +229,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                               itemCount: bleState.discoveredDevices.length,
                               itemBuilder: (context, index) {
                                 final result = bleState.discoveredDevices[index];
+                                final isConnecting = bleState.connectionState == BleConnectionState.connecting &&
+                                    bleState.connectedDevice?.remoteId.toString() == result.device.remoteId.toString();
+
                                 return DeviceListItem(
                                   result: result,
-                                  connectionState: bleState.connectionState,
-                                  connectingDeviceId: bleState.connectedDevice?.remoteId.toString(),
+                                  isConnecting: isConnecting,
                                   onConnect: () async {
                                     // Guard: Prevent connection if already connecting or connected
                                     if (bleState.connectionState == BleConnectionState.connecting ||

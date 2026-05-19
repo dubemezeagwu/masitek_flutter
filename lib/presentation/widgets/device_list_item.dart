@@ -1,28 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../../core/models/ble_connection_state.dart';
 import '../../core/extensions/rssi_extensions.dart';
 
-/// Reusable widget for displaying a discovered BLE device in a list.
-///
-/// Used in Milestone 3+ when BLE scanning is implemented.
-/// Takes a ScanResult from flutter_blue_plus and displays:
-/// - Device name (or "Unknown Device" if empty)
-/// - Device MAC address
-/// - Signal strength indicator (RSSI-based)
-/// - "Connect" button with loading state
 class DeviceListItem extends StatelessWidget {
   final ScanResult result;
   final VoidCallback onConnect;
-  final BleConnectionState connectionState;
-  final String? connectingDeviceId;
+  final bool isConnecting;
 
   const DeviceListItem({
     super.key,
     required this.result,
     required this.onConnect,
-    required this.connectionState,
-    this.connectingDeviceId,
+    required this.isConnecting,
   });
 
   @override
@@ -32,10 +21,6 @@ class DeviceListItem extends StatelessWidget {
     final deviceName = device.platformName.isNotEmpty
         ? device.platformName
         : 'Unknown Device';
-
-    // Check if THIS device is currently being connected to
-    final isConnecting = connectionState == BleConnectionState.connecting &&
-        connectingDeviceId == device.remoteId.toString();
 
     // Get signal strength metrics using RSSI extension
     final rssi = result.rssi;

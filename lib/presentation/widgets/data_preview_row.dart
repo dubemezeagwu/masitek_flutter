@@ -2,10 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Compact row showing both hex bytes and decoded message.
-///
-/// Format: [Hex: 63 6F] | [Message: congo]
-/// Color highlights when data is present.
+// Format: e.g. [Hex: 63 6F] | [Message: congo]
+// Color highlights when data is present.
+
 class DataPreviewRow extends StatelessWidget {
   final List<int>? bytes;
 
@@ -14,7 +13,7 @@ class DataPreviewRow extends StatelessWidget {
     this.bytes,
   });
 
-  /// Converts byte array to hex string (e.g., [99, 111] → "63 6F")
+  // Converts byte array to hex string (e.g., [99, 111] → "63 6F")
   String _bytesToHex() {
     if (bytes == null || bytes!.isEmpty) {
       return '-- -- -- --';
@@ -22,10 +21,6 @@ class DataPreviewRow extends StatelessWidget {
     return bytes!.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
   }
 
-  /// Decodes byte array to UTF-8 string if it's readable text.
-  ///
-  /// Returns decoded string only if it contains printable ASCII characters.
-  /// Otherwise returns "Binary data" (e.g., for sensor values).
   String _decodeMessage() {
     if (bytes == null || bytes!.isEmpty) {
       return 'No data';
@@ -35,8 +30,6 @@ class DataPreviewRow extends StatelessWidget {
       final decoded = utf8.decode(bytes!, allowMalformed: true);
 
       // Check if string contains only printable ASCII characters
-      // Printable ASCII: space (32) through tilde (126)
-      // Also allow common whitespace: tab (9), newline (10), carriage return (13)
       final isPrintable = decoded.runes.every((rune) {
         return (rune >= 32 && rune <= 126) || // Printable ASCII
                rune == 9 || rune == 10 || rune == 13; // Tab, LF, CR
