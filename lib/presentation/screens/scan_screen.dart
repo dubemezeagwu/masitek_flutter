@@ -1,16 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import '../../core/models/ble_connection_state.dart';
-import '../../core/extensions/date_time_extensions.dart';
-import '../providers/ble_provider.dart';
-import '../providers/worker_isolate_provider.dart';
-import '../widgets/device_list_item.dart';
-import '../widgets/date_time_widget.dart';
-import '../widgets/connected_device_banner.dart';
-import 'main_screen.dart';
+import '../../ble/app_ble.dart';
+import '../../core/app_core.dart';
+import '../../services/app_services.dart';
+import '../app_presentation.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});

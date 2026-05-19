@@ -1,8 +1,6 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chart_data_point.dart';
-import '../../core/models/processed_sample.dart';
-import '../../data/isolate/worker_isolate.dart';
-import 'chart_provider.dart';
+import '../../core/app_core.dart';
+import '../../data/app_data.dart';
+import '../app_presentation.dart';
 
 class WorkerIsolateState {
   final WorkerIsolate? isolate;

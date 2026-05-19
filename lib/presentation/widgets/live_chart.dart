@@ -1,7 +1,4 @@
-import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/chart_provider.dart';
+import '../app_presentation.dart';
 
 // Live chart displaying raw sensor values in real-time.
 // Updates automatically as new data arrives via BLE.

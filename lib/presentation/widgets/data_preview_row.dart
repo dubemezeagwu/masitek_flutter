@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/app_core.dart';
 
 // Format: e.g. [Hex: 63 6F] | [Message: congo]
 // Color highlights when data is present.

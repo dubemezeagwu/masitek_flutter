@@ -1,6 +1,5 @@
-import 'package:camera/camera.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/camera_service.dart';
+import '../../services/app_services.dart';
+import '../app_presentation.dart';
 
 final cameraProvider = StateNotifierProvider<CameraNotifier, CameraState>((ref) {
   return CameraNotifier();

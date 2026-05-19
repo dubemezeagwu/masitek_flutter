@@ -1,6 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../../core/extensions/rssi_extensions.dart';
+import '../../ble/app_ble.dart';
+import '../../core/app_core.dart';
 
 class DeviceListItem extends StatelessWidget {
   final ScanResult result;

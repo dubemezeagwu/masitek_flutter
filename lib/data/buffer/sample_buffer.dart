@@ -1,4 +1,4 @@
-import '../../core/models/processed_sample.dart';
+import '../../core/app_core.dart';
 
 /// Buffer for accumulating processed samples during a recording session.
 ///

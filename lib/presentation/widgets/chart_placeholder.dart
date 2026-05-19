@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../app_presentation.dart';
 
 class ChartPlaceholder extends StatelessWidget {
   const ChartPlaceholder({super.key});

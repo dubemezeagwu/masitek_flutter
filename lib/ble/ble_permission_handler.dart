@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
+import '../services/app_services.dart';
 
 // handles BLE permission requests with SDK-branched logic.
 //

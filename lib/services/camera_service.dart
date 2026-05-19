@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'package:camera/camera.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import '../core/extensions/date_time_extensions.dart';
+import '../core/app_core.dart';
+import 'app_services.dart';
 
 // Responsibilities:
 // - Initialize camera controller (back camera)

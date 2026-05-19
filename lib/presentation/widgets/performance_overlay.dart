@@ -1,7 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/performance_provider.dart';
-import '../../core/extensions/color_extensions.dart';
+import '../../core/app_core.dart';
+import '../app_presentation.dart';
 
 class PerformanceOverlay extends ConsumerWidget {
   const PerformanceOverlay({super.key});

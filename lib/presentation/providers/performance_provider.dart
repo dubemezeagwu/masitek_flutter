@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/performance_metrics.dart';
+import '../../core/app_core.dart';
+import '../app_presentation.dart';
 
 final performanceProvider = StateNotifierProvider<PerformanceNotifier, PerformanceState>((ref) {
   return PerformanceNotifier();

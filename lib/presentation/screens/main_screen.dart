@@ -1,17 +1,6 @@
-import 'package:camera/camera.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/ble_connection_state.dart';
-import '../../core/extensions/rssi_extensions.dart';
-import '../../services/persistence_service.dart';
-import '../providers/ble_provider.dart';
-import '../providers/camera_provider.dart';
-import '../providers/performance_provider.dart';
-import '../providers/worker_isolate_provider.dart';
-import '../widgets/connection_status_bar.dart';
-import '../widgets/data_preview_row.dart';
-import '../widgets/live_chart.dart';
-import '../widgets/date_time_widget.dart';
+import '../../core/app_core.dart';
+import '../../services/app_services.dart';
+import '../app_presentation.dart';
 import '../widgets/performance_overlay.dart' as perf;
 
 class MainScreen extends ConsumerStatefulWidget {

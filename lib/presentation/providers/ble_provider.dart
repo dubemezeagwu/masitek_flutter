@@ -1,15 +1,7 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/ble_connection_state.dart';
-import '../../core/errors/ble_error.dart';
-import '../../ble/ble_permission_handler.dart';
-import '../../ble/ble_scanner.dart';
-import '../../ble/ble_scanner_interface.dart';
-import '../../ble/ble_connection_manager.dart';
-import '../../ble/ble_connection_interface.dart';
-import 'worker_isolate_provider.dart';
+import '../../ble/app_ble.dart';
+import '../../core/app_core.dart';
+import '../app_presentation.dart';
 
 final bleScannerProvider = Provider<BleScannerInterface>((ref) {
   return BleScanner();

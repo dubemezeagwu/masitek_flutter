@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../core/constants/ble_constants.dart';
-import 'ble_scanner_interface.dart';
+import '../core/app_core.dart';
+import 'app_ble.dart';
 
 class BleScanner implements BleScannerInterface {
   final int _maxScanAttempts = BLEConstants.maxScanAttempts;

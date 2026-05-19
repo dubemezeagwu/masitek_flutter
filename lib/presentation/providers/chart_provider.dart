@@ -1,7 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/models/chart_data_point.dart';
-import '../../core/constants/ble_constants.dart';
-import 'performance_provider.dart';
+import '../../core/app_core.dart';
+import '../app_presentation.dart';
 
 class ChartState {
   final List<ChartDataPoint> dataPoints;

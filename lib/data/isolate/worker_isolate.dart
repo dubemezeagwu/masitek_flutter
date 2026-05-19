@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
-import '../../core/models/processed_sample.dart';
+import '../../core/app_core.dart';
 import '../parser/payload_parser.dart';
 import '../scripting/script_engine.dart';
 import '../buffer/sample_buffer.dart';

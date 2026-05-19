@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import '../../core/extensions/rssi_extensions.dart';
+import '../../core/app_core.dart';
 
 class ConnectedDeviceBanner extends StatelessWidget {
   final String deviceName;

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'app_ble.dart';
 
 abstract class BleConnectionInterface {
   Future<StreamSubscription<List<int>>> connectToDevice(

@@ -1,9 +1,6 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import '../core/constants/ble_constants.dart';
-import 'ble_connection_interface.dart';
+import '../core/app_core.dart';
+import 'app_ble.dart';
 
 // Connection Flow:
 // 1. Stop scan before connecting
