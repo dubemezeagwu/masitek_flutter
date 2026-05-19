@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import '../../core/models/ble_connection_state.dart';
-import '../../core/models/chart_data_point.dart';
 import '../../core/extensions/date_time_extensions.dart';
-import '../../data/isolate/worker_isolate.dart';
 import '../providers/ble_provider.dart';
-import '../providers/chart_provider.dart';
+import '../providers/worker_isolate_provider.dart';
 import '../widgets/device_list_item.dart';
 import '../widgets/date_time_widget.dart';
 import '../widgets/connected_device_banner.dart';
@@ -21,8 +20,6 @@ class ScanScreen extends ConsumerStatefulWidget {
 }
 
 class _ScanScreenState extends ConsumerState<ScanScreen> {
-  WorkerIsolate? _workerIsolate;
-
   @override
   void initState() {
     super.initState();
@@ -32,31 +29,22 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     });
   }
 
-  /// Request all required permissions upfront (BLE + Camera + Microphone).
-  ///
-  /// This runs once on app launch to avoid interrupting user workflow later.
-  /// Individual permission checks still exist as safety guards.
   Future<void> _requestAllPermissionsUpfront() async {
     try {
-      // Get Android SDK version for BLE permission branching
       final deviceInfo = DeviceInfoPlugin();
       final androidInfo = await deviceInfo.androidInfo;
       final sdkInt = androidInfo.version.sdkInt;
 
-      // BLE permissions (SDK-branched)
       List<Permission> blePermissions;
       if (sdkInt >= 31) {
-        // Android 12+ (API 31+)
         blePermissions = [
           Permission.bluetoothScan,
           Permission.bluetoothConnect,
         ];
       } else {
-        // Android 6-11 (API 23-30)
         blePermissions = [Permission.location];
       }
 
-      // Camera and Microphone permissions
       final cameraPermission = Permission.camera;
       final microphonePermission = Permission.microphone;
 
@@ -70,8 +58,55 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   @override
   void dispose() {
-    _workerIsolate?.kill();
     super.dispose();
+  }
+
+  Future<void> _handleDeviceConnection(ScanResult result) async {
+    final bleNotifier = ref.read(bleProvider.notifier);
+    final bleState = ref.read(bleProvider);
+
+    // Guard: Prevent connection if already connecting or connected
+    if (bleState.connectionState == BleConnectionState.connecting ||
+        bleState.connectionState == BleConnectionState.connected) {
+      return;
+    }
+
+    // Capture context-dependent values before async gap
+    final messenger = ScaffoldMessenger.of(context);
+    final theme = Theme.of(context);
+    final workerIsolateNotifier = ref.read(workerIsolateProvider.notifier);
+
+    // Spawn worker isolate
+    await workerIsolateNotifier.spawn();
+
+    // Connect to device
+    final success = await bleNotifier.connectToDevice(
+      result.device,
+      onDataReceived: (bytes) {
+        bleNotifier.updateReceivedBytes(bytes);
+        workerIsolateNotifier.processBytes(bytes);
+      },
+    );
+
+    // Show feedback
+    if (success) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Connected! Click "Go to Session" to start recording.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            bleState.errorMessage ?? 'Connection failed',
+          ),
+          backgroundColor: theme.colorScheme.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -81,7 +116,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
     // Listen for errors and show toast (SnackBar)
     ref.listen<BleState>(bleProvider, (previous, next) {
-      // Show toast if there's a new error message
       if (next.errorMessage != null && next.errorMessage != previous?.errorMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -135,12 +169,10 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       ),
       body: Column(
         children: [
-          // Date and time display
           const DateTimeWidget(),
 
           const SizedBox(height: 8),
 
-          // Connected device banner (show when connected)
           if (bleState.connectionState == BleConnectionState.connected &&
               bleState.connectedDevice != null)
             ConnectedDeviceBanner(
@@ -152,14 +184,12 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 await bleNotifier.disconnect();
               },
               onReturnToSession: () {
-                // Navigate to MainScreen with existing worker isolate
-                if (_workerIsolate != null) {
+                final workerIsolateState = ref.read(workerIsolateProvider);
+                if (workerIsolateState.isSpawned) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => MainScreen(
-                        workerIsolate: _workerIsolate!,
-                      ),
+                      builder: (_) => const MainScreen(),
                     ),
                   );
                 } else {
@@ -176,7 +206,6 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           if (bleState.connectionState == BleConnectionState.connected)
             const SizedBox(height: 8),
 
-          // Device list
           Expanded(
             child: bleState.connectionState == BleConnectionState.connected
                 ? Center(
@@ -223,6 +252,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                               ),
                             ),
                           ),
+
                           // Device list
                           Expanded(
                             child: ListView.builder(
@@ -235,70 +265,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                                 return DeviceListItem(
                                   result: result,
                                   isConnecting: isConnecting,
-                                  onConnect: () async {
-                                    // Guard: Prevent connection if already connecting or connected
-                                    if (bleState.connectionState == BleConnectionState.connecting ||
-                                        bleState.connectionState == BleConnectionState.connected) {
-                                      return;
-                                    }
-
-                                    // Capture messenger and chart notifier before async gap
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    final theme = Theme.of(context);
-                                    final chartNotifier = ref.read(chartProvider.notifier);
-
-                                    // Spawn worker isolate with hardcoded transformation (M7)
-                                    _workerIsolate = WorkerIsolate(
-                                      onProcessedSamples: (processedSamples) {
-                                        // Convert ProcessedSamples to ChartDataPoints
-                                        final chartPoints = processedSamples.map((sample) {
-                                          return ChartDataPoint.fromProcessedSample(
-                                            timestamp: sample.timestamp,
-                                            rawValue: sample.rawValue,
-                                            processedValue: sample.processedValue,
-                                          );
-                                        }).toList();
-
-                                        chartNotifier.addDataPoints(chartPoints);
-                                      },
-                                    );
-
-                                    // Spawn isolate (transformation: processed = raw * 0.12 + 34)
-                                    await _workerIsolate!.spawn();
-
-                                    // Connect to device
-                                    final success = await bleNotifier.connectToDevice(
-                                      result.device,
-                                      onDataReceived: (bytes) {
-                                        // Update state with received bytes for UI display
-                                        bleNotifier.updateReceivedBytes(bytes);
-
-                                        // Send bytes to worker isolate for processing
-                                        _workerIsolate?.processBytes(bytes);
-                                      },
-                                    );
-
-                                    if (success) {
-                                      // Show success message - user can now click "Go to Session" button
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: const Text('Connected! Click "Go to Session" to start recording.'),
-                                          backgroundColor: Colors.green,
-                                          duration: const Duration(seconds: 3),
-                                        ),
-                                      );
-                                    } else {
-                                      // Show error
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            bleState.errorMessage ?? 'Connection failed',
-                                          ),
-                                          backgroundColor: theme.colorScheme.error,
-                                        ),
-                                      );
-                                    }
-                                  },
+                                  onConnect: () => _handleDeviceConnection(result),
                                 );
                               },
                             ),

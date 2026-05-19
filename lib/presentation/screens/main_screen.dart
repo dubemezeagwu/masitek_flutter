@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/ble_connection_state.dart';
 import '../../core/extensions/rssi_extensions.dart';
 import '../../services/persistence_service.dart';
-import '../../data/isolate/worker_isolate.dart';
 import '../providers/ble_provider.dart';
 import '../providers/camera_provider.dart';
 import '../providers/performance_provider.dart';
+import '../providers/worker_isolate_provider.dart';
 import '../widgets/connection_status_bar.dart';
 import '../widgets/data_preview_row.dart';
 import '../widgets/live_chart.dart';
@@ -15,12 +15,7 @@ import '../widgets/date_time_widget.dart';
 import '../widgets/performance_overlay.dart' as perf;
 
 class MainScreen extends ConsumerStatefulWidget {
-  final WorkerIsolate workerIsolate;
-
-  const MainScreen({
-    super.key,
-    required this.workerIsolate,
-  });
+  const MainScreen({super.key});
 
   @override
   ConsumerState<MainScreen> createState() => _MainScreenState();
@@ -46,7 +41,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     });
   }
 
-  /// Initialize camera for recording
   Future<void> _initializeCamera() async {
     final cameraInitialized = await _cameraNotifier!.initialize();
 
@@ -78,12 +72,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
-        // App came to foreground
         if (_isRecording) {
-          // Already recording - camera is alive, just resume RSSI
           ref.read(bleProvider.notifier).resumeRssiPolling();
         } else {
-          // Not recording - reinitialize everything
           _initializeCamera();
           ref.read(bleProvider.notifier).resumeRssiPolling();
         }
@@ -116,53 +107,34 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     }
   }
 
+  ({String text, Color color}) _getConnectionStatus(BleConnectionState state) {
+    if (_isRecording) {
+      return (text: 'Recording...', color: Colors.orange);
+    }
+
+    return switch (state) {
+      BleConnectionState.connected => (text: 'Connected', color: Colors.green),
+      BleConnectionState.connecting => (text: 'Connecting...', color: Colors.orange),
+      BleConnectionState.reconnecting => (text: 'Reconnecting...', color: Colors.amber),
+      BleConnectionState.disconnected => (text: 'Disconnected', color: Colors.red),
+      BleConnectionState.failed => (text: 'Connection Failed', color: Colors.red),
+      BleConnectionState.scanning => (text: 'Scanning...', color: Colors.blue),
+    };
+  }
+
+  String _getScreenTitle(String? deviceName) {
+    return (deviceName != null && deviceName.isNotEmpty)
+        ? deviceName
+        : 'BLE Live Monitor';
+  }
+
   @override
   Widget build(BuildContext context) {
     final bleState = ref.watch(bleProvider);
     final cameraState = ref.watch(cameraProvider);
 
-    // Determine status text and color based on connection state
-    final String statusText;
-    final Color statusColor;
-
-    // Override status if recording
-    if (_isRecording) {
-      statusText = 'Recording...';
-      statusColor = Colors.orange;
-    } else {
-      switch (bleState.connectionState) {
-        case BleConnectionState.connected:
-          statusText = 'Connected';
-          statusColor = Colors.green;
-          break;
-        case BleConnectionState.connecting:
-          statusText = 'Connecting...';
-          statusColor = Colors.orange;
-          break;
-        case BleConnectionState.reconnecting:
-          statusText = 'Reconnecting...';
-          statusColor = Colors.amber;
-          break;
-        case BleConnectionState.disconnected:
-          statusText = 'Disconnected';
-          statusColor = Colors.red;
-          break;
-        case BleConnectionState.failed:
-          statusText = 'Connection Failed';
-          statusColor = Colors.red;
-          break;
-        case BleConnectionState.scanning:
-          statusText = 'Scanning...';
-          statusColor = Colors.blue;
-          break;
-      }
-    }
-
-    // Get device name for title, fallback to default if null/empty
-    final deviceName = bleState.connectedDevice?.platformName;
-    final title = (deviceName != null && deviceName.isNotEmpty)
-        ? deviceName
-        : 'BLE Live Monitor';
+    final status = _getConnectionStatus(bleState.connectionState);
+    final title = _getScreenTitle(bleState.connectedDevice?.platformName);
 
     return Scaffold(
       appBar: AppBar(
@@ -212,8 +184,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
 
                     // Connection status (right side)
                     ConnectionStatusBar(
-                      status: statusText,
-                      color: statusColor,
+                      status: status.text,
+                      color: status.color,
                     ),
                   ],
                 ),
@@ -221,14 +193,12 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
 
               const SizedBox(height: 4),
 
-              // Data preview - compact row showing hex and decoded message
               DataPreviewRow(
                 bytes: bleState.lastReceivedBytes,
               ),
 
               const SizedBox(height: 8),
 
-              // Live chart - displays raw sensor values in real-time
               const Expanded(
                 child: LiveChart(),
               ),
@@ -245,11 +215,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
               child: _buildCameraPreview(),
             ),
 
-          // Performance metrics overlay
           const perf.PerformanceOverlay(),
         ],
       ),
-      // FAB for starting/stopping recording (icon only)
       floatingActionButton: FloatingActionButton(
         onPressed: _isRecording ? _stopRecording : _startRecording,
         backgroundColor: _isRecording ? Colors.red : Colors.blue,
@@ -369,7 +337,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       final endTime = DateTime.now();
       final startTime = _recordingStartTime ?? endTime;
 
-      // Stop camera recording
       final videoPath = await cameraNotifier.stopRecording();
 
       setState(() {
@@ -377,22 +344,19 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         _recordingStartTime = null;
       });
 
-      // Flush buffer from worker isolate (get all accumulated samples)
-      final samples = await widget.workerIsolate.flushBuffer();
+      final workerIsolateNotifier = ref.read(workerIsolateProvider.notifier);
+      final samples = await workerIsolateNotifier.flushBuffer();
 
-      // Save JSON file with real sample data
       final jsonPath = await PersistenceService.saveSessionData(
         samples: samples,
         startTime: startTime,
         endTime: endTime,
       );
 
-      // Dismiss loading dialog
       if (mounted) {
         Navigator.of(context).pop();
       }
 
-      // Show success message
       if (mounted && videoPath != null) {
         showDialog(
           context: context,
@@ -439,7 +403,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         _recordingStartTime = null;
       });
 
-      // Dismiss loading dialog
       if (mounted) {
         Navigator.of(context).pop();
       }
@@ -448,7 +411,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     }
   }
 
-  /// Shows error message as snackbar
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

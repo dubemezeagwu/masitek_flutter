@@ -8,6 +8,7 @@ import '../../ble/ble_scanner.dart';
 import '../../ble/ble_scanner_interface.dart';
 import '../../ble/ble_connection_manager.dart';
 import '../../ble/ble_connection_interface.dart';
+import 'worker_isolate_provider.dart';
 
 String _getUserFriendlyError(String technicalError) {
   // Log technical error for debugging
@@ -49,7 +50,7 @@ final bleConnectionProvider = Provider<BleConnectionInterface>((ref) {
 final bleProvider = StateNotifierProvider<BleNotifier, BleState>((ref) {
   final scanner = ref.watch(bleScannerProvider);
   final connectionManager = ref.watch(bleConnectionProvider);
-  return BleNotifier(scanner, connectionManager);
+  return BleNotifier(scanner, connectionManager, ref);
 });
 
 class BleState {
@@ -95,6 +96,7 @@ class BleState {
 class BleNotifier extends StateNotifier<BleState> {
   final BleScannerInterface _scanner;
   final BleConnectionInterface _connectionManager;
+  final Ref _ref;
 
   StreamSubscription<List<ScanResult>>? _scanSubscription;
   StreamSubscription<List<int>>? _dataSubscription;
@@ -103,7 +105,7 @@ class BleNotifier extends StateNotifier<BleState> {
   Timer? _rssiTimer; // Periodic timer for RSSI polling (every 2 seconds)
   Function(List<int>)? _currentDataCallback; // Store for reconnect
 
-  BleNotifier(this._scanner, this._connectionManager) : super(const BleState()) {
+  BleNotifier(this._scanner, this._connectionManager, this._ref) : super(const BleState()) {
     // Listen to FlutterBluePlus scanning state to keep UI in sync
     _isScanningSubscription = FlutterBluePlus.isScanning.listen((isScanning) {
       // If scan stopped but our state still shows scanning, reset it
@@ -277,6 +279,11 @@ class BleNotifier extends StateNotifier<BleState> {
       _startRssiPolling();
     } catch (e) {
       debugPrint('[Provider] ❌ Reconnection failed: $e');
+
+      // Kill worker isolate on failed reconnection
+      final workerIsolateNotifier = _ref.read(workerIsolateProvider.notifier);
+      await workerIsolateNotifier.kill();
+
       state = state.copyWith(
         connectionState: BleConnectionState.failed,
         errorMessage: _getUserFriendlyError('Reconnection failed: $e'),
@@ -289,6 +296,10 @@ class BleNotifier extends StateNotifier<BleState> {
     if (state.connectedDevice != null) {
       // Stop RSSI polling
       _stopRssiPolling();
+
+      // Kill worker isolate
+      final workerIsolateNotifier = _ref.read(workerIsolateProvider.notifier);
+      await workerIsolateNotifier.kill();
 
       // Set state to disconnected FIRST to prevent reconnection logic from triggering
       state = state.copyWith(

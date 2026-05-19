@@ -141,6 +141,7 @@ class CameraService {
       _controller = null;
       _isInitialized = false;
     } catch (e) {
+      // Silently ignore dispose errors (cleanup should never throw)
     }
   }
 
