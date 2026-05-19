@@ -12,7 +12,8 @@ class DateTimeWidget extends StatefulWidget {
 
 class _DateTimeWidgetState extends State<DateTimeWidget> {
   late String _currentDateTime;
-  Timer? _timer;
+  Timer? _syncTimer;
+  Timer? _periodicTimer;
 
   @override
   void initState() {
@@ -24,15 +25,16 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
     final secondsUntilNextMinute = 60 - now.second;
 
     // Wait until next minute, then update every minute
-    Timer(Duration(seconds: secondsUntilNextMinute), () {
+    _syncTimer = Timer(Duration(seconds: secondsUntilNextMinute), () {
       _updateDateTime();
-      _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _periodicTimer = Timer.periodic(const Duration(minutes: 1), (_) {
         _updateDateTime();
       });
     });
   }
 
   void _updateDateTime() {
+    if (!mounted) return;
     setState(() {
       _currentDateTime = DateTime.now().toFormattedDateTimeString();
     });
@@ -62,7 +64,8 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _syncTimer?.cancel();
+    _periodicTimer?.cancel();
     super.dispose();
   }
 }
