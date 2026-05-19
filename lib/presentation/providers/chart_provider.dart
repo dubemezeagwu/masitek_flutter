@@ -3,17 +3,9 @@ import '../../core/models/chart_data_point.dart';
 import '../../core/constants/ble_constants.dart';
 import 'performance_provider.dart';
 
-/// Maximum number of data points to keep in buffer.
-/// Allows panning back through historical data.
-/// Memory: ~1000 points = ~32KB (negligible overhead)
-const int kMaxChartPoints = BLEConstants.maxChartPoints;
-
-/// State holding chart data with rolling window.
 class ChartState {
-  /// Rolling window of data points (max 1000)
   final List<ChartDataPoint> dataPoints;
 
-  /// Absolute sample counter (increments forever, never resets)
   final int nextSampleIndex;
 
   const ChartState({
@@ -21,7 +13,6 @@ class ChartState {
     required this.nextSampleIndex,
   });
 
-  /// Initial empty state
   const ChartState.initial() : dataPoints = const [], nextSampleIndex = 0;
 
   /// Creates new state with updated data points
@@ -35,23 +26,17 @@ class ChartState {
     );
   }
 
-  /// Whether chart has any data to display
   bool get hasData => dataPoints.isNotEmpty;
 
-  /// Number of points currently in buffer
   int get pointCount => dataPoints.length;
 }
 
-/// Notifier managing chart data state.
 class ChartNotifier extends StateNotifier<ChartState> {
   final Ref ref;
 
   ChartNotifier(this.ref) : super(const ChartState.initial());
 
-  /// Adds a new data point to the chart.
-  ///
-  /// Automatically enforces 1000-point rolling window by dropping oldest points.
-  /// Assigns absolute sample index automatically.
+
   void addDataPoint(ChartDataPoint point) {
     // Create new point with assigned sample index
     final indexedPoint = ChartDataPoint(
@@ -64,9 +49,8 @@ class ChartNotifier extends StateNotifier<ChartState> {
     final updatedPoints = List<ChartDataPoint>.from(state.dataPoints);
     updatedPoints.add(indexedPoint);
 
-    // Enforce rolling window: keep only last 1000 points
-    if (updatedPoints.length > kMaxChartPoints) {
-      updatedPoints.removeAt(0); // Remove oldest point
+    if (updatedPoints.length > BLEConstants.maxChartPoints) {
+      updatedPoints.removeAt(0);
     }
 
     state = state.copyWith(
@@ -75,10 +59,7 @@ class ChartNotifier extends StateNotifier<ChartState> {
     );
   }
 
-  /// Adds multiple data points at once (batch operation).
-  ///
-  /// More efficient than calling addDataPoint repeatedly.
-  /// Assigns absolute sample indices automatically.
+
   void addDataPoints(List<ChartDataPoint> points) {
     final updatedPoints = List<ChartDataPoint>.from(state.dataPoints);
     int currentIndex = state.nextSampleIndex;
@@ -95,8 +76,7 @@ class ChartNotifier extends StateNotifier<ChartState> {
       currentIndex++;
     }
 
-    // Enforce rolling window
-    while (updatedPoints.length > kMaxChartPoints) {
+    while (updatedPoints.length > BLEConstants.maxChartPoints) {
       updatedPoints.removeAt(0);
     }
 
@@ -109,7 +89,6 @@ class ChartNotifier extends StateNotifier<ChartState> {
     ref.read(performanceProvider.notifier).recordChartRender();
   }
 
-  /// Clears all chart data (e.g., on disconnect or new session).
   void clearData() {
     state = const ChartState.initial();
   }

@@ -3,18 +3,10 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/performance_metrics.dart';
 
-/// Performance metrics provider for tracking app performance.
-///
-/// Tracks:
-/// - FPS (frames per second) via SchedulerBinding
-/// - Memory usage (MB) via dart:developer
-/// - BLE notification rate (notifications/sec)
-/// - Chart render rate (renders/sec)
 final performanceProvider = StateNotifierProvider<PerformanceNotifier, PerformanceState>((ref) {
   return PerformanceNotifier();
 });
 
-/// Performance state containing metrics and overlay visibility.
 class PerformanceState {
   final PerformanceMetrics metrics;
   final bool overlayVisible;
@@ -49,16 +41,16 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
           metrics: PerformanceMetrics.initial(),
           overlayVisible: false,
         )) {
-    // Start FPS tracking
+
     _startFpsTracking();
   }
 
-  /// Start tracking FPS using SchedulerBinding.
+  // Start tracking FPS using SchedulerBinding.
   void _startFpsTracking() {
     SchedulerBinding.instance.addPostFrameCallback(_onFrameRendered);
   }
 
-  /// Called after each frame render to calculate FPS.
+  // Called after each frame render to calculate FPS.
   void _onFrameRendered(Duration timestamp) {
     _frameCount++;
 
@@ -79,7 +71,6 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     SchedulerBinding.instance.addPostFrameCallback(_onFrameRendered);
   }
 
-  /// Start periodic metrics collection (every 1 second).
   void startTracking() {
     _metricsTimer?.cancel();
     _metricsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -87,14 +78,12 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     });
   }
 
-  /// Stop periodic metrics collection.
   void stopTracking() {
     _metricsTimer?.cancel();
   }
 
-  /// Update metrics snapshot (called every 1 second).
   void _updateMetrics() {
-    // Calculate rates (per second)
+
     final bleRate = _bleNotificationCount;
     final chartRate = _chartRenderCount;
 
@@ -114,21 +103,17 @@ class PerformanceNotifier extends StateNotifier<PerformanceState> {
     _chartRenderCount = 0;
   }
 
-  /// Record a BLE notification received.
   void recordBleNotification() {
     _bleNotificationCount++;
   }
 
-  /// Record a chart render.
   void recordChartRender() {
     _chartRenderCount++;
   }
 
-  /// Toggle performance overlay visibility.
   void toggleOverlay() {
     state = state.copyWith(overlayVisible: !state.overlayVisible);
 
-    // Start/stop tracking based on visibility
     if (state.overlayVisible) {
       startTracking();
     } else {
