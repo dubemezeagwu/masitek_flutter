@@ -309,15 +309,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 20),
-              Text('Saving data...'),
-            ],
-          ),
-        ),
+        builder: (context) => const SavingDialog(),
       );
     }
 

@@ -15,6 +15,7 @@ export 'widgets/data_preview_row.dart';
 export 'widgets/connected_device_banner.dart';
 export 'widgets/chart_placeholder.dart';
 export 'widgets/date_time_widget.dart';
+export 'widgets/saving_dialog.dart';
 
 export 'providers/ble_provider.dart';
 export 'providers/camera_provider.dart';
