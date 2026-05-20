@@ -1,19 +1,8 @@
 import 'dart:typed_data';
 import '../../core/app_core.dart';
 
-/// Utility for parsing 8-byte BLE payloads into RawSample objects.
-///
-/// Protocol:
-/// - Each notification: 8 bytes = 2 samples
-/// - Sample format: [uint16 channel, int16 value] (big-endian)
-/// - Bytes 0-3: Sample 1
-/// - Bytes 4-7: Sample 2
 class PayloadParser {
-  /// Parses 8-byte payload into 2 RawSample objects.
-  ///
-  /// Throws [FormatException] if:
-  /// - Payload length != 8 bytes
-  /// - Data cannot be parsed
+  // - Sample format: [uint16 channel, int16 value] (big-endian)
   static List<RawSample> parse(List<int> bytes) {
     if (bytes.length != 8) {
       throw FormatException(
@@ -56,18 +45,13 @@ class PayloadParser {
     }
   }
 
-  /// Converts byte array to hex string for debugging.
-  ///
-  /// Example: [0, 1, 254, 255] → "00 01 FE FF"
+  // Example: [0, 1, 254, 255] → "00 01 FE FF"
   static String bytesToHex(List<int> bytes) {
     return bytes
         .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
         .join(' ');
   }
-
-  /// Validates if payload can be parsed without exceptions.
-  ///
-  /// Returns true if valid, false otherwise.
+  
   static bool isValidPayload(List<int> bytes) {
     try {
       parse(bytes);
