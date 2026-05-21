@@ -1,11 +1,7 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import '../../core/app_core.dart';
 
-/// Widget displaying current date and time, updated every minute.
-///
-/// Displays format: "May 12, 2026 • 9:30 AM"
-/// Updates automatically every minute to minimize rebuilds.
-/// Uses Dart's built-in DateTime - no external packages required.
+
 class DateTimeWidget extends StatefulWidget {
   const DateTimeWidget({super.key});
 
@@ -15,49 +11,32 @@ class DateTimeWidget extends StatefulWidget {
 
 class _DateTimeWidgetState extends State<DateTimeWidget> {
   late String _currentDateTime;
-  Timer? _timer;
+  Timer? _syncTimer;
+  Timer? _periodicTimer;
 
   @override
   void initState() {
     super.initState();
     _updateDateTime();
-    // Update every minute
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+
+    // Calculate seconds until next minute
+    final now = DateTime.now();
+    final secondsUntilNextMinute = 60 - now.second;
+
+    // Wait until next minute, then update every minute
+    _syncTimer = Timer(Duration(seconds: secondsUntilNextMinute), () {
       _updateDateTime();
+      _periodicTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+        _updateDateTime();
+      });
     });
   }
 
   void _updateDateTime() {
-    final now = DateTime.now();
+    if (!mounted) return;
     setState(() {
-      _currentDateTime = _formatDateTime(now);
+      _currentDateTime = DateTime.now().toFormattedDateTimeString();
     });
-  }
-
-  /// Formats DateTime to "May 12, 2026 • 9:30 AM" format.
-  String _formatDateTime(DateTime dt) {
-    // Month names
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-
-    // Format date: "May 12, 2026"
-    final date = '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
-
-    // Format time: "9:30 AM"
-    final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
-    final minute = dt.minute.toString().padLeft(2, '0');
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    final time = '$hour:$minute $period';
-
-    return '$date • $time';
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
   }
 
   @override
@@ -80,5 +59,12 @@ class _DateTimeWidgetState extends State<DateTimeWidget> {
         ),
       ],
     );
+  }
+
+  @override
+  void dispose() {
+    _syncTimer?.cancel();
+    _periodicTimer?.cancel();
+    super.dispose();
   }
 }

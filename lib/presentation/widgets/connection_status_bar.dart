@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import '../../core/extensions/color_extensions.dart';
+import '../../core/app_core.dart';
 
 class ConnectionStatusBar extends StatelessWidget {
   final String status;

@@ -1,9 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/theme/app_theme.dart';
-import 'presentation/screens/scan_screen.dart';
+import 'ble/app_ble.dart';
+import 'core/app_core.dart';
+import 'presentation/app_presentation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

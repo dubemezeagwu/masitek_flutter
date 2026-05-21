@@ -1,14 +1,6 @@
-import 'package:camera/camera.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/camera_service.dart';
+import '../../services/app_services.dart';
+import '../app_presentation.dart';
 
-/// Camera state provider managing camera initialization and recording.
-///
-/// Provides:
-/// - Camera initialization status
-/// - Recording status
-/// - Camera controller for preview
-/// - Error messages
 final cameraProvider = StateNotifierProvider<CameraNotifier, CameraState>((ref) {
   return CameraNotifier();
 });
@@ -42,15 +34,11 @@ class CameraState {
   }
 }
 
-/// Camera state notifier managing camera operations via CameraService.
 class CameraNotifier extends StateNotifier<CameraState> {
   final CameraService _cameraService = CameraService();
 
   CameraNotifier() : super(const CameraState());
 
-  /// Initializes camera with back camera.
-  ///
-  /// Returns true if successful, false if camera unavailable or permission denied.
   Future<bool> initialize() async {
 
     final success = await _cameraService.initialize();
@@ -71,9 +59,7 @@ class CameraNotifier extends StateNotifier<CameraState> {
     return success;
   }
 
-  /// Starts video recording.
-  ///
-  /// Returns true if recording started successfully, false otherwise.
+
   Future<bool> startRecording() async {
     if (!state.isInitialized) {
       state = state.copyWith(errorMessage: 'Camera not initialized');
@@ -100,9 +86,6 @@ class CameraNotifier extends StateNotifier<CameraState> {
     return success;
   }
 
-  /// Stops video recording and returns the file path.
-  ///
-  /// Returns null if no recording in progress or stop failed.
   Future<String?> stopRecording() async {
     if (!state.isRecording) {
       return null;
@@ -115,14 +98,9 @@ class CameraNotifier extends StateNotifier<CameraState> {
       errorMessage: filePath == null ? 'Failed to save video' : null,
     );
 
-    if (filePath != null) {
-    } else {
-    }
-
     return filePath;
   }
 
-  /// Disposes camera controller and releases resources.
   Future<void> disposeCamera() async {
     await _cameraService.dispose();
 
@@ -136,7 +114,11 @@ class CameraNotifier extends StateNotifier<CameraState> {
 
   @override
   void dispose() {
-    _cameraService.dispose();
+    // disposeCamera() already handles cleanup when explicitly called
+    // If not called, ensure cleanup happens on provider destruction
+    if (state.isInitialized) {
+      _cameraService.dispose();
+    }
     super.dispose();
   }
 }
