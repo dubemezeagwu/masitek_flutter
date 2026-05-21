@@ -134,6 +134,14 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         centerTitle: false,
         elevation: 0,
         actions: [
+          // Clear chart button
+          IconButton(
+            icon: const Icon(Icons.clear_all),
+            tooltip: 'Clear Chart',
+            onPressed: () {
+              ref.read(chartProvider.notifier).clearData();
+            },
+          ),
           // Performance metrics toggle button
           IconButton(
             icon: const Icon(Icons.speed),
