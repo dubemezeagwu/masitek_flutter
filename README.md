@@ -313,18 +313,6 @@ Add to `android/app/proguard-rules.pro`:
 -keep class androidx.camera.** { *; }
 ```
 
-### iOS Background BLE (Future Enhancement)
-
-Add to `ios/Runner/Info.plist` if iOS support needed:
-```xml
-<key>UIBackgroundModes</key>
-<array>
-  <string>bluetooth-central</string>
-</array>
-```
-
----
-
 ## Future Enhancements (Out of Scope)
 
 - User-editable script transformations (text input for QuickJS code)
