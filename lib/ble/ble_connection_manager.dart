@@ -70,13 +70,13 @@ class BleConnectionManager implements BleConnectionInterface {
           rethrow;
         }
 
-        debugPrint('[BLE] ✅ Connected successfully');
+        debugPrint('[BLE] Connected successfully');
         return subscription;
       } catch (e) {
         if (attemptCount < _maxConnectionAttempts) {
           await Future.delayed(_retryBackoff[attemptCount - 1]);
         } else {
-          debugPrint('[BLE] ❌ Connection failed: $e');
+          debugPrint('[BLE] Connection failed: $e');
           throw BleConnectionException(
             'Failed to connect after $_maxConnectionAttempts attempts: $e',
           );
@@ -101,7 +101,7 @@ class BleConnectionManager implements BleConnectionInterface {
       try {
         await device.connect(autoConnect: true);
 
-        // CRITICAL:rRe-discover services after every reconnect
+        // CRITICAL:Re-discover services after every reconnect
         final services = await device.discoverServices();
 
         final nusService = services.firstWhere(

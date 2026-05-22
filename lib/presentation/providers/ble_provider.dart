@@ -190,11 +190,11 @@ class BleNotifier extends StateNotifier<BleState> {
         onDataReceived: _currentDataCallback!,
       );
 
-      debugPrint('[Provider] ✅ Reconnected successfully');
+      debugPrint('[Provider] Reconnected successfully');
       state = state.copyWith(connectionState: BleConnectionState.connected);
       _startRssiPolling();
     } catch (e) {
-      debugPrint('[Provider] ❌ Reconnection failed: $e');
+      debugPrint('[Provider] Reconnection failed: $e');
 
       final workerIsolateNotifier = _ref.read(workerIsolateProvider.notifier);
       await workerIsolateNotifier.kill();

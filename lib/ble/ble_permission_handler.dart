@@ -25,12 +25,13 @@ class BlePermissionHandler {
     final androidInfo = await deviceInfo.androidInfo;
     final sdkInt = androidInfo.version.sdkInt;
 
-    // android 12+
+    // android 12+ (still requires location for BLE scanning)
     if (sdkInt >= 31) {
       final scanStatus = await Permission.bluetoothScan.request();
       final connectStatus = await Permission.bluetoothConnect.request();
+      final locationStatus = await Permission.locationWhenInUse.request();
 
-      return scanStatus.isGranted && connectStatus.isGranted;
+      return scanStatus.isGranted && connectStatus.isGranted && locationStatus.isGranted;
     } else {
       // android 6-11
       final locationStatus = await Permission.locationWhenInUse.request();
@@ -59,11 +60,12 @@ class BlePermissionHandler {
     final androidInfo = await deviceInfo.androidInfo;
     final sdkInt = androidInfo.version.sdkInt;
 
-    // android 12+
+    // android 12+ (still requires location for BLE scanning)
     if (sdkInt >= 31) {
       final scanGranted = await Permission.bluetoothScan.isGranted;
       final connectGranted = await Permission.bluetoothConnect.isGranted;
-      return scanGranted && connectGranted;
+      final locationGranted = await Permission.locationWhenInUse.isGranted;
+      return scanGranted && connectGranted && locationGranted;
     } else {
       // android 6-11
       return await Permission.locationWhenInUse.isGranted;
