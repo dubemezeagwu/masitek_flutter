@@ -13,6 +13,7 @@
 migrate_working_dir/
 .vscode
 present.md
+milestone.md
 
 # IntelliJ related
 *.iml
