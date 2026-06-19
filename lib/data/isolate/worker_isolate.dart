@@ -8,17 +8,20 @@ import '../buffer/sample_buffer.dart';
 // Main spawns worker → Worker creates ReceivePort → Worker sends SendPort back
 // Main receives SendPort → Stores in _sendPort → Communication ready
 
-class WorkerMessage { // Main -> Buffer
+class WorkerMessage {
+  // Main -> Buffer
   final List<int> bytes;
 
   WorkerMessage(this.bytes);
 }
 
-class FlushBufferCommand { // Main -> Buffer
+class FlushBufferCommand {
+  // Main -> Buffer
   const FlushBufferCommand();
 }
 
-class BufferFlushResponse { // Buffer -> Main
+class BufferFlushResponse {
+  // Buffer -> Main
   final List<ProcessedSample> samples;
 
   BufferFlushResponse(this.samples);
@@ -33,6 +36,10 @@ class WorkerIsolateConfig {
 class WorkerIsolate {
   Isolate? _isolate;
   SendPort? _sendPort;
+  ReceivePort? _errorPort;
+  ReceivePort? _exitPort;
+
+  bool _isSpawned = false;
   final ReceivePort _receivePort = ReceivePort();
   Completer<List<ProcessedSample>>? _flushCompleter;
 
@@ -41,15 +48,41 @@ class WorkerIsolate {
   WorkerIsolate({required this.onProcessedSamples});
 
   Future<void> spawn() async {
+    // if isolate has been spawned, return early
+    if (_isSpawned) return;
+
+    _errorPort = ReceivePort();
+    _exitPort = ReceivePort();
+
+    _errorPort!.listen((errorData) {
+      debugPrint("Worker Isolate Error: ${errorData[0]}");
+      debugPrint("Stack Trace: ${errorData[1]}");
+      // TODO: Send to analytics in production
+    });
+
+    _exitPort!.listen((message) {
+      debugPrint("Worker Isolate exited. Message $message");
+
+      _isSpawned = false;
+
+      // clean up
+      _errorPort?.close();
+      _exitPort?.close();
+    });
+
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
       WorkerIsolateConfig(sendPort: _receivePort.sendPort),
+      onError: _errorPort!.sendPort,
+      onExit: _exitPort!.sendPort,
+      debugName: "BLE-Worker",
     );
 
     _receivePort.listen((message) {
       if (message is SendPort) {
         // Handshake: worker sends its SendPort first
         _sendPort = message;
+        _isSpawned = true;
       } else if (message is List<ProcessedSample>) {
         onProcessedSamples(message);
       } else if (message is BufferFlushResponse) {
@@ -62,7 +95,6 @@ class WorkerIsolate {
   void processBytes(List<int> bytes) {
     _sendPort?.send(WorkerMessage(bytes));
   }
-
 
   Future<List<ProcessedSample>> flushBuffer() async {
     if (_sendPort == null) {
@@ -89,6 +121,10 @@ class WorkerIsolate {
   void kill() {
     _isolate?.kill(priority: Isolate.immediate);
     _receivePort.close();
+    _errorPort?.close();
+    _exitPort?.close();
+    _isSpawned = false;
+    _sendPort = null;
   }
 
   // Worker isolate entry point - runs in separate OS thread
