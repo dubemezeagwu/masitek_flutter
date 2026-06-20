@@ -333,7 +333,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         _recordingStartTime = null;
       });
 
-      final workerIsolateNotifier = ref.read(workerIsolateProvider.notifier);
+      final workerIsolateNotifier = ref.read(bleDataProcessorProvider.notifier);
       final samples = await workerIsolateNotifier.flushBuffer();
 
       final jsonPath = await PersistenceService.saveSessionData(

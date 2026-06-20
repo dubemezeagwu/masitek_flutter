@@ -4,36 +4,18 @@ import '../../core/app_core.dart';
 import '../parser/payload_parser.dart';
 import '../scripting/script_engine.dart';
 import '../buffer/sample_buffer.dart';
+import 'worker_messages.dart';
 
 // Main spawns worker → Worker creates ReceivePort → Worker sends SendPort back
 // Main receives SendPort → Stores in _sendPort → Communication ready
 
-class WorkerMessage {
-  // Main -> Buffer
-  final List<int> bytes;
-
-  WorkerMessage(this.bytes);
-}
-
-class FlushBufferCommand {
-  // Main -> Buffer
-  const FlushBufferCommand();
-}
-
-class BufferFlushResponse {
-  // Buffer -> Main
-  final List<ProcessedSample> samples;
-
-  BufferFlushResponse(this.samples);
-}
-
-class WorkerIsolateConfig {
+class BleDataProcessorConfig {
   final SendPort sendPort;
 
-  WorkerIsolateConfig({required this.sendPort});
+  BleDataProcessorConfig({required this.sendPort});
 }
 
-class WorkerIsolate {
+class BleDataProcessor {
   Isolate? _isolate;
   SendPort? _sendPort;
   ReceivePort? _errorPort;
@@ -43,9 +25,12 @@ class WorkerIsolate {
   final ReceivePort _receivePort = ReceivePort();
   Completer<List<ProcessedSample>>? _flushCompleter;
 
+  // Buffer in main thread for safety and separation of concerns
+  final SampleBuffer _buffer = SampleBuffer();
+
   final void Function(List<ProcessedSample>) onProcessedSamples;
 
-  WorkerIsolate({required this.onProcessedSamples});
+  BleDataProcessor({required this.onProcessedSamples});
 
   Future<void> spawn() async {
     // if isolate has been spawned, return early
@@ -71,8 +56,8 @@ class WorkerIsolate {
     });
 
     _isolate = await Isolate.spawn(
-      _isolateEntryPoint,
-      WorkerIsolateConfig(sendPort: _receivePort.sendPort),
+      _workerEntryPoint,
+      BleDataProcessorConfig(sendPort: _receivePort.sendPort),
       onError: _errorPort!.sendPort,
       onExit: _exitPort!.sendPort,
       debugName: "BLE-Worker",
@@ -83,10 +68,18 @@ class WorkerIsolate {
         // Handshake: worker sends its SendPort first
         _sendPort = message;
         _isSpawned = true;
-      } else if (message is List<ProcessedSample>) {
-        onProcessedSamples(message);
+      } else if (message is ProcessedDataResponse) {
+        _buffer.addAll(message.samples);
+        onProcessedSamples(message.samples);
+      } else if (message is ParseErrorResponse) {
+        debugPrint('Parse error: ${message.error}');
+        debugPrint('Raw bytes: ${message.rawBytes}');
+        debugPrint('Stack: ${message.stackTrace}');
+        // TODO: Log to analytics in production
       } else if (message is BufferFlushResponse) {
-        _flushCompleter?.complete(message.samples);
+        // Worker acknowledged - now flush main thread buffer
+        final flushedSamples = _buffer.flush();
+        _flushCompleter?.complete(flushedSamples);
         _flushCompleter = null;
       }
     });
@@ -125,12 +118,12 @@ class WorkerIsolate {
     _exitPort?.close();
     _isSpawned = false;
     _sendPort = null;
+    _buffer.clear(); // Clean up main thread buffer
   }
 
-  // Worker isolate entry point - runs in separate OS thread
-  static void _isolateEntryPoint(WorkerIsolateConfig config) {
+  // Worker entry point - runs in separate OS thread (STATELESS)
+  static void _workerEntryPoint(BleDataProcessorConfig config) {
     final receivePort = ReceivePort();
-    final buffer = SampleBuffer();
 
     // Handshake: send our SendPort to main isolate
     config.sendPort.send(receivePort.sendPort);
@@ -150,14 +143,21 @@ class WorkerIsolate {
             );
           }).toList();
 
-          buffer.addAll(processedSamples);
-          config.sendPort.send(processedSamples);
-        } catch (e) {
-          config.sendPort.send(<ProcessedSample>[]);
+          // Send processed data back - no buffering in worker
+          config.sendPort.send(ProcessedDataResponse(processedSamples));
+        } catch (e, stackTrace) {
+          config.sendPort.send(
+            ParseErrorResponse(
+              error: e.toString(),
+              stackTrace: stackTrace.toString(),
+              rawBytes: message.bytes,
+            ),
+          );
         }
       } else if (message is FlushBufferCommand) {
-        final flushedSamples = buffer.flush();
-        config.sendPort.send(BufferFlushResponse(flushedSamples));
+        // Worker has no buffer - just acknowledge the flush request
+        // Main thread will flush its own buffer when it receives this
+        config.sendPort.send(BufferFlushResponse(const []));
       }
     });
   }

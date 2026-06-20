@@ -21,4 +21,4 @@ export 'providers/ble_provider.dart';
 export 'providers/camera_provider.dart';
 export 'providers/chart_provider.dart';
 export 'providers/performance_provider.dart';
-export 'providers/worker_isolate_provider.dart';
+export 'providers/ble_data_processor_provider.dart';

@@ -1,1 +1,1 @@
-export 'isolate/worker_isolate.dart';
+export 'worker/ble_data_processor.dart';
