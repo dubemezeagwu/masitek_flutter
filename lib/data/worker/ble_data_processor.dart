@@ -97,10 +97,17 @@ class BleDataProcessor {
     _flushCompleter = Completer<List<ProcessedSample>>();
     _sendPort!.send(const FlushBufferCommand());
 
+    // Calculate dynamic timeout based on buffer size
+    // Formula: 5s base + 1s per 1000 samples, capped at 30s
+    final sampleCount = _buffer.count;
+    final timeoutSeconds = (5 + (sampleCount ~/ 1000)).clamp(5, 30);
+    final timeout = Duration(seconds: timeoutSeconds);
+
     try {
       return await _flushCompleter!.future.timeout(
-        const Duration(seconds: 5),
+        timeout,
         onTimeout: () {
+          debugPrint('⚠️ Flush timeout after ${timeoutSeconds}s for $sampleCount samples');
           _flushCompleter = null;
           return [];
         },
@@ -123,6 +130,9 @@ class BleDataProcessor {
 
   // Worker entry point - runs in separate OS thread (STATELESS)
   static void _workerEntryPoint(BleDataProcessorConfig config) {
+    
+    // TODO: Add thread priority optimization via platform channel
+  
     final receivePort = ReceivePort();
 
     // Handshake: send our SendPort to main isolate
