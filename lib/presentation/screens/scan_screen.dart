@@ -66,7 +66,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     // Capture context-dependent values before async gap
     final messenger = ScaffoldMessenger.of(context);
     final theme = Theme.of(context);
-    final workerIsolateNotifier = ref.read(workerIsolateProvider.notifier);
+    final workerIsolateNotifier = ref.read(bleDataProcessorProvider.notifier);
 
     // Spawn worker isolate
     await workerIsolateNotifier.spawn();
@@ -176,7 +176,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                 await bleNotifier.disconnect();
               },
               onReturnToSession: () {
-                final workerIsolateState = ref.read(workerIsolateProvider);
+                final workerIsolateState = ref.read(bleDataProcessorProvider);
                 if (workerIsolateState.isSpawned) {
                   Navigator.push(
                     context,

@@ -196,7 +196,7 @@ class BleNotifier extends StateNotifier<BleState> {
     } catch (e) {
       debugPrint('[Provider] Reconnection failed: $e');
 
-      final workerIsolateNotifier = _ref.read(workerIsolateProvider.notifier);
+      final workerIsolateNotifier = _ref.read(bleDataProcessorProvider.notifier);
       await workerIsolateNotifier.kill();
 
       state = state.copyWith(
@@ -211,7 +211,7 @@ class BleNotifier extends StateNotifier<BleState> {
 
     _stopRssiPolling();
 
-    final workerIsolateNotifier = _ref.read(workerIsolateProvider.notifier);
+    final workerIsolateNotifier = _ref.read(bleDataProcessorProvider.notifier);
     await workerIsolateNotifier.kill();
 
     state = state.copyWith(

@@ -2,37 +2,37 @@ import '../../core/app_core.dart';
 import '../../data/app_data.dart';
 import '../app_presentation.dart';
 
-class WorkerIsolateState {
-  final WorkerIsolate? isolate;
+class BleDataProcessorState {
+  final BleDataProcessor? processor;
   final bool isSpawned;
 
-  WorkerIsolateState({
-    this.isolate,
+  BleDataProcessorState({
+    this.processor,
     this.isSpawned = false,
   });
 
-  WorkerIsolateState copyWith({
-    WorkerIsolate? isolate,
+  BleDataProcessorState copyWith({
+    BleDataProcessor? processor,
     bool? isSpawned,
   }) {
-    return WorkerIsolateState(
-      isolate: isolate ?? this.isolate,
+    return BleDataProcessorState(
+      processor: processor ?? this.processor,
       isSpawned: isSpawned ?? this.isSpawned,
     );
   }
 }
 
-class WorkerIsolateNotifier extends StateNotifier<WorkerIsolateState> {
+class BleDataProcessorNotifier extends StateNotifier<BleDataProcessorState> {
   final Ref ref;
 
-  WorkerIsolateNotifier(this.ref) : super(WorkerIsolateState());
+  BleDataProcessorNotifier(this.ref) : super(BleDataProcessorState());
 
   Future<void> spawn() async {
     if (state.isSpawned) return;
 
     final chartNotifier = ref.read(chartProvider.notifier);
 
-    final isolate = WorkerIsolate(
+    final processor = BleDataProcessor(
       onProcessedSamples: (processedSamples) {
         final chartPoints = processedSamples.map((sample) {
           return ChartDataPoint.fromProcessedSample(
@@ -46,29 +46,29 @@ class WorkerIsolateNotifier extends StateNotifier<WorkerIsolateState> {
       },
     );
 
-    await isolate.spawn();
+    await processor.spawn();
 
     state = state.copyWith(
-      isolate: isolate,
+      processor: processor,
       isSpawned: true,
     );
   }
 
   void processBytes(List<int> bytes) {
-    state.isolate?.processBytes(bytes);
+    state.processor?.processBytes(bytes);
   }
 
   Future<List<ProcessedSample>> flushBuffer() async {
-    if (state.isolate == null) return [];
-    return await state.isolate!.flushBuffer();
+    if (state.processor == null) return [];
+    return await state.processor!.flushBuffer();
   }
 
   Future<void> kill() async {
-    state.isolate?.kill();
-    state = WorkerIsolateState();
+    state.processor?.kill();
+    state = BleDataProcessorState();
   }
 }
 
-final workerIsolateProvider = StateNotifierProvider<WorkerIsolateNotifier, WorkerIsolateState>((ref) {
-  return WorkerIsolateNotifier(ref);
+final bleDataProcessorProvider = StateNotifierProvider<BleDataProcessorNotifier, BleDataProcessorState>((ref) {
+  return BleDataProcessorNotifier(ref);
 });
