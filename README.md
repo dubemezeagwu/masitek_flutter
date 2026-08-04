@@ -1,4 +1,4 @@
-# Masitek BLE Data Recorder
+#  LE Data Recorder
 
 Mobile app for recording real-time BLE sensor data with synchronized video capture and live charting built primarily for Android with Flutter.
 
